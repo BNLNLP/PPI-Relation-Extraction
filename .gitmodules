@@ -1,3 +1,0 @@
-[submodule "BERT-Relation-Extraction"]
-	path = BERT-Relation-Extraction
-	url = ./BERT-Relation-Extraction/
