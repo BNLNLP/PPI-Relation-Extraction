@@ -1,0 +1,1199 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Nov 26 18:12:22 2019
+
+@author: weetee
+"""
+
+## Find the modifications by the tag [GP].
+
+import os
+import re
+import random
+import copy
+import pandas as pd
+import json
+import torch
+from torch.utils.data import Dataset, DataLoader
+from torch.nn.utils.rnn import pad_sequence
+from ..misc import save_as_pickle, load_pickle
+from tqdm import tqdm
+import logging
+import csv
+import re
+import pickle
+
+# [GP][START] - for cross-validation. 09-29-2020
+from sklearn.model_selection import KFold, train_test_split
+import numpy as np
+# [GP][END] - for cross-validation. 09-29-2020
+
+
+tqdm.pandas(desc="prog_bar")
+logging.basicConfig(format='%(asctime)s [%(levelname)s]: %(message)s', \
+					datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO)
+logger = logging.getLogger('__file__')
+
+def process_text(text, mode='train'):
+	sents, relations, comments, blanks = [], [], [], []
+	for i in range(int(len(text)/4)):
+		sent = text[4*i]
+		relation = text[4*i + 1]
+		comment = text[4*i + 2]
+		blank = text[4*i + 3]
+
+		# check entries
+		# [GP][START] - don't check index numbers since BioCreative may have different numbers. 11-27-2020
+		'''
+		if mode == 'train':
+			assert int(re.match("^\d+", sent)[0]) == (i + 1)
+		else:
+			assert (int(re.match("^\d+", sent)[0]) - 8000) == (i + 1)
+		'''
+		# [GP][END] - don't check index numbers since BioCreative may have different numbers. 11-27-2020
+		assert re.match("^Comment", comment)
+		assert len(blank) == 1
+		
+		sent = re.findall("\"(.+)\"", sent)[0]
+		sent = re.sub('<e1>', '[E1]', sent)
+		sent = re.sub('</e1>', '[/E1]', sent)
+		sent = re.sub('<e2>', '[E2]', sent)
+		sent = re.sub('</e2>', '[/E2]', sent)
+		sents.append(sent); relations.append(relation), comments.append(comment); blanks.append(blank)
+	return sents, relations, comments, blanks
+
+
+def preprocess_semeval2010_8(args):
+	'''
+	Data preprocessing for SemEval2010 task 8 dataset
+	'''
+	data_path = args.train_data #'./data/SemEval2010_task8_all_data/SemEval2010_task8_training/TRAIN_FILE.TXT'
+	logger.info("Reading training file %s..." % data_path)
+	with open(data_path, 'r', encoding='utf8') as f:
+		text = f.readlines()
+	
+	sents, relations, comments, blanks = process_text(text, 'train')
+	df_train = pd.DataFrame(data={'sents': sents, 'relations': relations})
+	
+	data_path = args.test_data #'./data/SemEval2010_task8_all_data/SemEval2010_task8_testing_keys/TEST_FILE_FULL.TXT'
+	logger.info("Reading test file %s..." % data_path)
+	with open(data_path, 'r', encoding='utf8') as f:
+		text = f.readlines()
+	
+	sents, relations, comments, blanks = process_text(text, 'test')
+	df_test = pd.DataFrame(data={'sents': sents, 'relations': relations})
+	
+	rm = Relations_Mapper(df_train['relations'])
+	save_as_pickle('relations.pkl', rm)
+	df_test['relations_id'] = df_test.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
+	df_train['relations_id'] = df_train.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
+	save_as_pickle('df_train.pkl', df_train)
+	save_as_pickle('df_test.pkl', df_test)
+	logger.info("Finished and saved!")
+	
+	return df_train, df_test, rm
+
+
+# [GP][START] - preprocess BioCreative data. 11-26-2020
+# deprecated - Sean moved an annotation file to a google doc and provided a converter (google doc txt file to tsv file). - 12-17-2020
+def get_samples_from_csv(file, num_of_sample=None):
+	samples = []
+	with open(file, encoding='utf-8') as csv_file:
+		csv_reader = csv.reader(csv_file, delimiter=',')
+		for row in csv_reader:
+			num = row[0].strip()
+			sentence = row[2].strip()
+			relation = row[3].strip()
+			relation_type = row[4].strip()
+			comment = row[5].strip()
+			
+			sentence = sentence.replace(u"\u00A0", " ") # remove non-breaking space. e.g., non-breaking space between 'alpha4' and 'integrins' in the row 9.
+			
+			if relation == '':
+				continue
+			
+			if relation_type == '':
+				print('relation_type is None!!')
+				print(sentence)
+				continue
+				
+			if relation_type not in ['structural', 'enzyme', 'misc']:
+				print('this relation_type is undefined!!')
+				print(sentence)
+				continue
+				
+			relation = relation.split(';')
+			rel_pairs = []
+			for rel in relation:
+				print('rel:', rel.strip())
+				
+				entities = re.split(' -> | - | \? ', rel)
+				entities = [x.strip() for x in entities]
+				entities = [x.replace('_', ' ') for x in entities]
+				
+				print('entities:', entities)
+				
+				if len(entities) != 2:
+					print('this is not a pair relation:', entities)
+					continue
+
+				entity_grp_1 = [x.strip() for x in entities[0].split(',')] # e.g., FnBPA, FnBPB - fibronectin, fibrinogen, elastin
+				entity_grp_2 = [x.strip() for x in entities[1].split(',')] # e.g., FnBPA, FnBPB - fibronectin, fibrinogen, elastin
+				
+				for e1 in entity_grp_1:
+					for e2 in entity_grp_2:
+						e1 = e1.replace('[', '').replace(']', '') # [ x ] indicates a family or class of proteins named x
+						e2 = e2.replace('[', '').replace(']', '') # [ x ] indicates a family or class of proteins named x
+						
+						if e1 not in sentence or e2 not in sentence:
+							print('not existence error - e1:', e1, '/ e2:', e2)
+							continue
+						
+						if e1 == e2:
+							print('e1 and e2 are the same - e1:', e1, '/ e2:', e2)
+							continue
+					
+						tagged_sentence = sentence.replace(e1, '<e1>' + e1 + '</e1>', 1)
+						tagged_sentence = tagged_sentence.replace(e2, '<e2>' + e2 + '</e2>', 1)
+						
+						sample = []
+						sample.append(num + '\t"' + tagged_sentence + '"')
+						sample.append(relation_type + '(e1,e2)')
+						sample.append('Comment: ' + comment)
+						sample.append('\n')
+						
+						
+						# debugging
+						'''
+						print(num + '\t"' + tagged_sentence + '"')
+						print(relation_type + '(e1,e2)')
+						print('Comment: ' + comment)
+						print('-------------------------------------------------\n')
+						input('enter...')
+						'''
+						
+						samples.append(sample)
+						
+						if num_of_sample != None and len(samples) == num_of_sample:
+							return samples
+	
+	return samples
+
+
+# this is a quick and very dirty string sanatizer for creating lookup keys based
+# on the passage string
+def modstring( s ):
+	return( s.replace(' ', '' ).replace('.','').upper()[0:100] )
+
+
+# once a passage record is collected, this is invoked to print out one TSV line
+def flush(sentences, selection, doc_num, text_num, pass_num, pass_total, annot, typ, notes, ian_comments):
+
+	#print( "Executing flush operation" )
+	passage = ""
+	for s in sentences:
+		#print( "    {0}".format( s ) )
+		passage += s + ". "
+	passage = passage[0:-2]    # remove extra .
+	k = modstring( passage )
+	#print( k )
+	'''
+	if k in string2row.keys():
+		row = string2row.get( k )
+		#print( "have row {0} for k".format( row ) )
+	else:
+		#print( "no row for k" )
+		row = ''
+	'''
+	row = ''
+
+	if selection != '':
+		selected_sentence = sentences[int(selection)-1]
+	else:
+		selected_sentence = ''
+
+	if typ == 'e':
+		typ = 'enzyme'
+	elif typ == 's':
+		typ = 'structural'
+
+	if doc_num == '':
+		return
+
+	#print( "\t".join( [row, doc_num, text_num, pass_num + "/" + pass_total, passage, selected_sentence, annot, typ, notes, ian_comments ] ) )
+
+	return [row, doc_num, text_num, pass_num + "/" + pass_total, selected_sentence, annot, typ, notes]
+
+
+# multi_flush handles multiple selected line numbers ( ie 1 & 2 )
+def multi_flush(sentences, selections, doc_num, text_num, pass_num, pass_total, annot, typ, notes, ian_comments):
+	for selection in re.split("\s*\&\s*", selections.strip()):
+		return flush(sentences, selection, doc_num, text_num, pass_num, pass_total, annot, typ, notes, ian_comments)
+
+
+def get_samples(file, num_of_sample=None):
+	passages = []
+	
+	state = 6
+	sentence = 0 
+	sentences = []
+	doc_num = ''
+	text_num = ''
+	pass_num = ''
+	pass_total = ''
+	selection = ''
+	annot = ''
+	typ = ''
+	notes = ''
+	ian_comments = ''
+
+	with open(file) as anf:
+		for line in anf:
+			line.strip()
+			line = line.replace( '\r', '' )
+			#print( "****line [{0}]\n".format( line ) )
+			if line[0:3] == "doc":
+				if ( state == 0 ):
+					state = 1
+					sentence_number = 1
+					sentences = []
+					m = re.match( "^doc\s+(\d+)\s+text\s+\#\s+(\d+)\s+passage\s+(\d+)/(\d+)", line )
+					if m:
+						#print( m.groups() )
+						doc_num, text_num, pass_num, pass_total = m.groups();
+					else:
+						print( "bad doc line {0}".format( line ) )
+						exit()
+				else:
+					print( "****hit doc state = {0} line {1}".format( state, line ) )
+					exit()
+			elif re.match( "(\d+)\)\s+(\S.*)", line ):
+				m = re.match( "(\d+)\)\s+(\S.*)", line )
+				sent_num, sent =  m.groups()
+				sent_num = int( sent_num )
+				#print( "{0}: [{1}]".format( sent_num, sent ) )
+				if state != 1:
+					print( "****hit sentence state = {0} line {1}".format( state, line ) )
+					exit()
+				if sent_num != sentence_number:
+					print( "****hit sentence number = [{0}] != [{1}] line ]{2}]".format( sent_num, sentence_number, line ) )
+					exit()
+				sentences.append( sent )
+				sentence_number += 1
+
+			elif line[0:7].lower() == "select:":
+				if ( state != 1 ):
+					print( "****hit select state = {0} line {1}".format( state, line ) )
+					exit()
+				selection = line[7:].strip()
+				state = 2
+
+			elif line[0:6].lower() == "annot:":
+				if ( state != 2 ):
+					print( "****hit annot state = {0} line {1}".format( state, line ) )
+					exit()
+				annot = line[6:].strip()
+				state = 3
+
+			elif line[0:5].lower() == "type:":
+				if ( state != 3 ):
+					print( "****hit type state = {0} line {1}".format( state, line ) )
+					exit()
+				typ = line[5:].strip()
+				state = 4
+
+			elif line[0:6].lower() == "notes:":
+				if ( state != 4 ):
+					print( "****hit notes state = {0} line {1}".format( state, line ) )
+					exit()
+				notes = line[6:].strip()
+				#print( "***notes = [{0}] line [{1}]\n".format( notes, line ) )
+				state = 5
+
+			elif line[0:2] == "I:":
+				if ( state != 5 ):
+					print( "****hit ian_comments state = {0} line [{1}]".format( state, line ) )
+					exit()
+				ian_comments = line[2:].strip()
+				state = 6
+			
+			elif line[0:10] == "----------":
+				if ( state < 5 ):
+					print( "****hit flush state = {0} line {1}".format( state, line ) )
+					exit()
+				
+				if typ != '':
+					passages.append(multi_flush(sentences, selection, doc_num, text_num, pass_num, pass_total, annot, typ, notes, ian_comments))
+					
+				selection = 0
+				doc_num = 0
+				text_num = 0
+				pass_num = 0
+				pass_total = 0
+				state = 0
+				annot = ''
+				typ = ''
+				notes = ''
+				ian_comments = ''
+
+	# don't forget last record
+	if typ != '':
+		passages.append(multi_flush(sentences, selection, doc_num, text_num, pass_num, pass_total, annot, typ, notes, ian_comments))
+
+	samples = {} # samples by documents
+
+	for passage in passages:
+		# passage -> [row, doc_num, text_num, pass_num + "/" + pass_total, selected_sentence, annot, typ, notes]
+		doc_num = passage[1]
+		unique_id = passage[1] + '_' + passage[2]
+		sentence = passage[4].strip()
+		relation = passage[5].strip()
+		relation_type = passage[6].strip()
+		comment = passage[7].strip()
+		
+		sentence = sentence.replace(u"\u00A0", " ") # remove non-breaking space. e.g., non-breaking space between 'alpha4' and 'integrins' in the row 9.
+		
+		if relation == '':
+			continue
+		
+		if relation_type == '':
+			print('relation_type is None!!')
+			print(sentence)
+			continue
+			
+		if relation_type not in ['structural', 'enzyme']: # exclude 'misc' for now since they are very few (only 3 as of 12-17-2020)
+			print('this relation_type is undefined!!')
+			print(sentence)
+			continue
+			
+		relation = relation.split(';')
+		rel_pairs = []
+		for rel in relation:
+			print('rel:', rel.strip())
+			
+			entities = re.split(' -> | - | \? ', rel)
+			entities = [x.strip() for x in entities]
+			entities = [x.replace('_', ' ') for x in entities]
+			
+			print('entities:', entities)
+			
+			if len(entities) != 2:
+				print('this is not a pair relation:', entities)
+				continue
+
+			entity_grp_1 = [x.strip() for x in entities[0].split(',')] # e.g., FnBPA, FnBPB - fibronectin, fibrinogen, elastin
+			entity_grp_2 = [x.strip() for x in entities[1].split(',')] # e.g., FnBPA, FnBPB - fibronectin, fibrinogen, elastin
+			
+			for e1 in entity_grp_1:
+				for e2 in entity_grp_2:
+					e1 = e1.replace('[', '').replace(']', '') # [ x ] indicates a family or class of proteins named x
+					e2 = e2.replace('[', '').replace(']', '') # [ x ] indicates a family or class of proteins named x
+					
+					if e1 not in sentence or e2 not in sentence:
+						print('not existence error - e1:', e1, '/ e2:', e2)
+						continue
+					
+					if e1 == e2:
+						print('e1 and e2 are the same - e1:', e1, '/ e2:', e2)
+						continue
+				
+					tagged_sentence = sentence.replace(e1, '<e1>' + e1 + '</e1>', 1)
+					tagged_sentence = tagged_sentence.replace(e2, '<e2>' + e2 + '</e2>', 1)
+					
+					sample = []
+					sample.append(unique_id + '\t"' + tagged_sentence + '"')
+					sample.append(relation_type + '(e1,e2)')
+					sample.append('Comment: ' + comment)
+					sample.append('\n')
+					
+					
+					# debugging
+					'''
+					print(unique_id + '\t"' + tagged_sentence + '"')
+					print(relation_type + '(e1,e2)')
+					print('Comment: ' + comment)
+					print('-------------------------------------------------\n')
+					input('enter...')
+					'''
+					
+					if doc_num in samples:
+						samples[doc_num].append(sample)
+					else:
+						samples[doc_num] = [sample]
+					
+					if num_of_sample != None and len(samples) == num_of_sample:
+						return samples
+
+	return samples
+
+
+def remove_unnecessary_token(psg_data):
+	"""
+	remove unnecessary tokens. '-' causes an error, so remove it.
+	"""
+	# debugging
+	#debug_flag = False
+	#print('Before:', psg_data)
+	
+	for tok_idx, tok in enumerate(psg_data['parsed_text']):
+		if tok == '-':
+			for x in range(len(psg_data['entities'])): # (ent_ncbi_id, ent_text, ent_type, ent_start, ent_end, offset, length)
+				if tok_idx < psg_data['entities'][x][3]:
+					psg_data['entities'][x][3] -= 1
+					psg_data['entities'][x][4] -= 1
+					
+					#debug_flag = True
+				elif tok_idx > psg_data['entities'][x][3] and tok_idx < psg_data['entities'][x][4]:
+					psg_data['entities'][x][4] -= 1
+					
+					#debug_flag = True
+	
+	psg_data['parsed_text'] = [tok.replace('-', '') for tok in psg_data['parsed_text'] if tok != '-']		
+	
+	for x in range(len(psg_data['entities'])): # (ent_ncbi_id, ent_text, ent_type, ent_start, ent_end, offset, length)
+		psg_data['entities'][x][1] = psg_data['entities'][x][1].replace('-', ' ')
+		psg_data['entities'][x] = tuple(psg_data['entities'][x])
+	
+	# debugging			
+	#print('----------------------------------------------------')
+	#print('After :', psg_data)
+	#if debug_flag:
+	#	input()
+	
+
+import spacy
+
+def preprocess_original_biocreative(data, nlp):
+	"""
+	to preprocess 'PMtask_Relations_TrainingSet.json' and 'PMtask_Relations_TestSet.json' for classification task.
+	"""
+	D = []
+	for doc in data["documents"]:
+		psg_data_list = []
+		for psg in doc["passages"]:
+			psg_data = {}
+			
+			psg_text = psg["text"]
+			psg_offset = psg["offset"]
+			
+			psg_data['raw_text'] = psg_text
+
+			psg_tokens = nlp(psg_text)
+			
+			'''
+			# TODO: remove this after testing - consider only a single sentence passage.
+			if len(list(psg_tokens.sents)) > 1:
+				#print(psg_text)
+				#print(list(psg_tokens.sents))
+				continue
+			'''
+			
+			entities = []
+			for anno in psg["annotations"]:
+				ent_text = anno["text"]
+				ent_type = anno["infons"]["type"]
+				if "NCBI GENE" in anno["infons"]:
+					ent_id = anno["infons"]["NCBI GENE"]
+				elif "identifier" in anno["infons"]:
+					ent_id = anno["infons"]["identifier"]
+
+				# debug
+				if len(anno["infons"]) > 2:
+					print('more than 3 values in infons')
+					for i in anno["infons"]:
+						print(i)
+					input()
+				  
+				# TODO: handle entities constructed from several different tokens. they are few (#21), so ignore them for now.
+				"""
+				e.g., 
+					tokens: ... 'nesprin-1', 'and', '-2', ...
+					entity: 'nesprin-2'
+						"locations": [
+							{
+							  "length": 7, 
+							  "offset": 203
+							}, 
+							{
+							  "length": 2, 
+							  "offset": 217
+							}
+					
+				"""
+				if len(anno["locations"]) > 1:
+					continue
+
+				for loc in anno["locations"]:
+					length = loc["length"]
+					offset = loc["offset"] - psg_offset
+					
+					ent_start = ent_end = -1
+					
+					idx_error = False
+					
+					for tok_seq, tok in enumerate(psg_tokens):
+						if tok.idx == offset:
+							ent_start = tok_seq
+							ent_end = tok_seq + 1
+							
+							if len(ent_text) > len(tok.text):
+								"""
+								e.g.,
+									token: beta
+									entity: beta-tublin
+								"""
+								for x in range(tok_seq + 1, len(psg_tokens)):
+									if ent_text.endswith(psg_tokens[x].text):
+										ent_end = x + 1
+										break
+									
+									if psg_tokens[x].text not in ent_text:
+										"""
+										e.g., 
+											psg_tokens: ['The', 'DEAD', '-', 'box', 'helicase', 'DDX3X', 'is', 'a', 'critical', 'component', 'of', 'the', 'TANK', '-', 'binding', 'kinase', '1-dependent', 'innate', 'immune', 'response', '.']                                                                                       │11/16/2020 09:14:45 AM [INFO]: Last batch samples (pos, neg): 1, 16
+											tok.text: TANK
+											ent_text: TANK-binding kinase 1 
+											
+										there is an index errors in the file.
+										the error, the offset 339 - 99 (passage offset) = 240 that indicates '.' in the tokens, ... 'receptor', 'R2', '.', 'Crystals', ...
+											{
+											  "text": "receptor R2", 
+											  "infons": {
+												"type": "Gene", 
+												"NCBI GENE": "7133"
+											  }, 
+											  "id": "15", 
+											  "locations": [
+												{
+												  "length": 11, 
+												  "offset": 339
+												}
+											  ]
+											}
+										"""
+										ent_end_pos = offset + length - psg_tokens[x].idx
+										
+										ent_segment = psg_tokens[x].text[:ent_end_pos]
+										tail_text = psg_tokens[x].text[ent_end_pos:]
+																			
+										if ent_segment not in ent_text:	# index error in the file.
+											idx_error = True
+											break
+										
+										# debug
+										'''
+										print('ent_segment:', ent_segment)
+										print('tail_text:', tail_text)
+										print("ent_text:", ent_text, '/ offset:', offset)
+										print("psg_tokens[x].text:", psg_tokens[x].text, '/ psg_tokens[x].idx:', psg_tokens[x].idx)
+										print("Before:", [x.text for x in psg_tokens])
+										'''
+
+										with psg_tokens.retokenize() as retokenizer:
+											heads = [(psg_tokens[x], 1), psg_tokens[x - 1]]
+											retokenizer.split(psg_tokens[x], [ent_segment, tail_text], heads=heads)
+										
+										ent_end = x + 1
+										
+										#print("After:", [x.text for x in psg_tokens])
+										
+										break
+		
+							elif len(ent_text) < len(tok.text):
+								"""
+								e.g.,
+									token: sin3-binding
+									entity: sin3
+									-> split token into 'sin3', '-binding' (tail_text)
+								"""
+								
+								# debug
+								'''
+								print("2 ent_text:", ent_text, '/ offset:', offset)
+								print("2 tok.text:", tok.text, '/ tok.idx:', tok.idx)
+								print("2 tok_seq:", tok_seq)
+								print("2 Before:", [x.text for x in psg_tokens])
+								'''
+								
+								with psg_tokens.retokenize() as retokenizer:
+									heads = [(psg_tokens[tok_seq], 1), psg_tokens[tok_seq - 1]]
+									tail_text = tok.text.split(ent_text, 1)[1]
+									retokenizer.split(psg_tokens[tok_seq], [ent_text, tail_text], heads=heads)
+
+								#print("2 After:", [x.text for x in psg_tokens])
+
+							break
+					
+					if idx_error == False and ent_start != -1 and ent_end != -1:
+						entity_annotation = [ent_id, ent_text, ent_type, ent_start, ent_end, offset, length]
+						entities.append(entity_annotation)					
+						
+						#print('entity annotation:', ent_id, ent_text, ent_type, ent_start, ent_end, offset, length)
+			
+			psg_data['parsed_text'] = [tok.text for tok in psg_tokens]
+			psg_data['entities'] = entities
+			
+			remove_unnecessary_token(psg_data) # remove '-' that causes an error in BERT Relation Extraction.
+
+			psg_data_list.append(psg_data)
+		
+		def get_entity(gene_ncbi_id, entities):
+			ret_val = []
+			for entity in entities:
+				if entity[0] == gene_ncbi_id:
+					ret_val.append(entity)
+			return ret_val
+
+		for rel in doc["relations"]:
+			rel_id = rel["id"]
+			gene1_ncbi_id = rel["infons"]["Gene1"]
+			gene2_ncbi_id = rel["infons"]["Gene2"]
+			gene_rel = rel["infons"]["relation"]
+			
+			for psg_data in psg_data_list:
+				gene1_entities = get_entity(gene1_ncbi_id, psg_data['entities'])
+				gene2_entities = get_entity(gene2_ncbi_id, psg_data['entities'])
+				
+				for g1e in gene1_entities:
+					for g2e in gene2_entities:
+						parsed_text = psg_data['parsed_text']
+						
+						g1_text = g1e[1]
+						g1_s = g1e[3]
+						g1_e = g1e[4]
+						g2_text = g2e[1]
+						g2_s = g2e[3]
+						g2_e = g2e[4]
+						
+						"""
+						entities must be ordered by index. if an entity with larger index appear earlier than the other one, it causes an error.
+						
+						e.g., (['Crystal', 'structure', 'of', 'tubulin', 'folding', 'cofactor', 'A', 'from', 'Arabidopsis', 'thaliana', 'and', 'its', 'beta', '-', 'tubulin', 'binding', 'characterization', '.'], (12, 15), (3, 7))
+						weirdly preprocessed --> ['[CLS]', 'crystal', 'structure', 'of', 'tubulin', 'folding', 'cofactor', 'a', 'from', 'arabidopsis', 'thaliana', 'and', 'its', '[E1]', 'beta', '-', 'tubulin', '[/E1]', '[E2]', 'tubulin', 'folding', 'cofactor', 'a', '[/E2]', 'from', 'arabidopsis', 'thaliana', 'and', 'its', 'beta', '-', 'tubulin', '[MASK]', 'characterization', '[MASK]', '[SEP]']
+						"""
+						if g1_s < g2_s:
+							D.append((
+									 ((parsed_text, (g1_s, g1_e), (g2_s, g2_e))),
+									 g1_text, 
+									 g2_text
+									 ))
+						else:
+							D.append((
+									 ((parsed_text, (g2_s, g2_e), (g1_s, g1_e))),
+									 g2_text,
+									 g1_text
+									 ))
+
+						# debug
+						'''
+						print(psg_data['parsed_text'], g1e[3:5], g2e[3:5], g1e[1], g2e[1])
+						
+						
+						if g1e[1].startswith(parsed_text[g1_s]) == False or g1e[1].endswith(parsed_text[g1_e - 1]) == False or \
+						   g2e[1].startswith(parsed_text[g2_s]) == False or g2e[1].endswith(parsed_text[g2_e - 1]) == False:
+							print(psg_data['parsed_text'][g1_s:g1_e])
+							print(psg_data['parsed_text'][g2_s:g2_e])
+							print('Mismatch error!!')
+							input()
+						'''
+
+		print(D)
+		print('doc id:', doc["id"])
+		input('enter..')
+		
+		
+		
+		
+	return D
+# [GP][END] - preprocess BioCreative data. 11-18-2020
+
+	
+def preprocess_biocreative(args):
+	"""
+	Data preprocessing for PPI annotations by BNL (Sean and Ian) from BioCreative datasets.
+	"""
+	# it used to retrieve a specific number of samples here, but since it reads a text from the beginning, it doesn't get random samples.
+	# so, read the data all, and shuffle it and then get a specific number of samples. - 12-23-2020
+	doc_samples = get_samples(args.train_data, None)
+	
+	print('num of docs:', len(doc_samples))
+	
+	keys = list(doc_samples.keys())
+	random.shuffle(keys)
+	
+	total_num = 0
+		
+	num_of_samples_for_eval = None
+	samples = []
+	counter = 0
+	
+	for k in keys:
+		#print(k, '/ num of samples:', len(doc_samples[k]))
+		total_num += len(doc_samples[k])
+		
+		if num_of_samples_for_eval != None:
+			counter += len(doc_samples[k])
+			if counter > num_of_samples_for_eval:
+				max_idx = counter - num_of_samples_for_eval
+				samples.append(doc_samples[k][:max_idx])
+				break
+			elif counter == num_of_samples_for_eval:
+				samples.append(doc_samples[k])
+				break
+			else:
+				samples.append(doc_samples[k])
+		else:
+			samples.append(doc_samples[k])
+			
+	print('num of total samples:', total_num)
+	#print(samples)
+	
+	# debugging
+	if num_of_samples_for_eval != None and num_of_samples_for_eval != len([item for sublist in samples for item in sublist]):
+		input('sampling number is wrong!!')
+
+	data_dir = args.train_data.rsplit('/', 1)[0]
+	
+	if args.do_cross_validation:
+		samples = np.array(samples)
+		kfold = KFold(n_splits=args.num_of_folds, shuffle=False)
+		for idx, (train_index, test_index) in enumerate(kfold.split(samples)):
+			
+			## Train/Validation(Dev)/Test split - 70/15/15, 80/10/10, 60/20/20 ratio
+			# adjust the ratio to 70/15/15
+			test_index_adjusted = np.append(test_index, train_index[:(len(test_index)//2)])
+			dev_index = train_index[(len(test_index)//2):(len(test_index)//2) + len(test_index_adjusted)]
+			train_index_adjusted = train_index[(len(test_index)//2) + len(dev_index):]
+
+			#print("TRAIN len:", len(train_index_adjusted), "DEV len:", len(dev_index), "TEST len:", len(test_index_adjusted))
+			#print("TRAIN:", train_index_adjusted, "DEV:", dev_index, "TEST:", test_index_adjusted)
+
+			train, dev, test = samples[train_index_adjusted], samples[dev_index], samples[test_index_adjusted]
+			
+			# flatten list
+			train_text = [item for sublist in train for subsublist in sublist for item in subsublist] 
+			dev_text = [item for sublist in dev for subsublist in sublist for item in subsublist] 
+			test_text = [item for sublist in test for subsublist in sublist for item in subsublist]
+			
+			sents, relations, comments, blanks = process_text(train_text, 'train')
+			df_train = pd.DataFrame(data={'sents': sents, 'relations': relations})
+			
+			sents, relations, comments, blanks = process_text(dev_text, 'dev')
+			df_dev = pd.DataFrame(data={'sents': sents, 'relations': relations})
+			
+			sents, relations, comments, blanks = process_text(test_text, 'test')
+			df_test = pd.DataFrame(data={'sents': sents, 'relations': relations})
+
+			rm = Relations_Mapper(pd.concat([df_train['relations'], df_dev['relations'], df_test['relations']], axis=0))
+			pickle.dump(rm, open(os.path.join(data_dir, 'relations_' + str(idx) + '.pkl'), "wb"))
+			
+			df_test['relations_id'] = df_test.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
+			df_dev['relations_id'] = df_dev.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
+			df_train['relations_id'] = df_train.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
+			pickle.dump(df_train, open(os.path.join(data_dir, 'df_train_' + str(idx) + '.pkl'), "wb"))
+			pickle.dump(df_dev, open(os.path.join(data_dir, 'df_dev_' + str(idx) + '.pkl'), "wb"))
+			pickle.dump(df_test, open(os.path.join(data_dir, 'df_test_' + str(idx) + '.pkl'), "wb"))
+			
+			if idx == 0:
+				first_df_train = df_train
+				first_df_dev = df_dev
+				first_df_test = df_test
+				first_rm = rm
+
+			## Train/Test split
+			# -> to use this code, 'samples' must be a list.
+			'''
+			print("TRAIN len:", len(train_index), "TEST len:", len(test_index))
+			print("TRAIN:", train_index, "TEST:", test_index)
+			
+			train, test = samples[train_index], samples[test_index]
+
+			train_text = [item for sublist in train for item in sublist] # flatten list
+			test_text = [item for sublist in test for item in sublist] # flatten list
+			
+			sents, relations, comments, blanks = process_text(train_text, 'train')
+			df_train = pd.DataFrame(data={'sents': sents, 'relations': relations})
+			
+			sents, relations, comments, blanks = process_text(test_text, 'test')
+			df_test = pd.DataFrame(data={'sents': sents, 'relations': relations})
+
+			rm = Relations_Mapper(pd.concat([df_train['relations'], df_test['relations']], axis=0))
+			pickle.dump(rm, open(os.path.join(data_dir, 'relations_' + str(idx) + '.pkl'), "wb"))
+			
+			df_test['relations_id'] = df_test.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
+			df_train['relations_id'] = df_train.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
+			pickle.dump(df_train, open(os.path.join(data_dir, 'df_train_' + str(idx) + '.pkl'), "wb"))
+			pickle.dump(df_test, open(os.path.join(data_dir, 'df_test_' + str(idx) + '.pkl'), "wb"))
+			
+			if idx == 0:
+				first_df_train = df_train
+				first_df_test = df_test
+				first_rm = rm
+			'''
+
+		logger.info("Finished and saved!")
+		
+	
+		input('enter..')
+		
+		return first_df_train, first_df_dev, first_df_test, first_rm # return the first CV set.
+		
+		''' deprecated
+		# split train/test into 8:2
+		split_offset = int((((len(text)/4)//10)*8)*4)
+		train_text = text[:split_offset]
+		test_text = text[split_offset:]
+
+		sents, relations, comments, blanks = process_text(train_text, 'train')
+		df_train = pd.DataFrame(data={'sents': sents, 'relations': relations})
+		
+		sents, relations, comments, blanks = process_text(test_text, 'test')
+		df_test = pd.DataFrame(data={'sents': sents, 'relations': relations})
+		
+		rm = Relations_Mapper(df_train['relations'])
+		pickle.dump(rm, open('./data/BioCreative/relations.pkl', "wb"))
+		
+		df_test['relations_id'] = df_test.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
+		df_train['relations_id'] = df_train.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
+		pickle.dump(df_train, open('./data/BioCreative/df_train.pkl', "wb"))
+		pickle.dump(df_test, open('./data/BioCreative/df_test.pkl', "wb"))	
+				
+		logger.info("Finished and saved!")
+				
+		return df_train, df_test, rm
+		'''	
+	else:
+		
+		
+		
+		if args.test_data.endswith('PMtask_Relation_TestSet.json'):
+			with open(args.test_data) as fp:
+				data = json.load(fp)
+			
+			nlp = spacy.load("en_core_web_lg", disable=["tagger", "ner"])
+
+			D = preprocess_original_biocreative(data, nlp)
+		#else:
+		
+		
+		
+		
+		
+		
+		
+		
+# [GP][END] - preprocess BioCreative data. 11-26-2020	
+	
+
+class Relations_Mapper(object):
+	def __init__(self, relations):
+		self.rel2idx = {}
+		self.idx2rel = {}
+		
+		logger.info("Mapping relations to IDs...")
+		self.n_classes = 0
+		for relation in tqdm(relations):
+			if relation not in self.rel2idx.keys():
+				self.rel2idx[relation] = self.n_classes
+				self.n_classes += 1
+		
+		for key, value in self.rel2idx.items():
+			self.idx2rel[value] = key
+
+class Pad_Sequence():
+	"""
+	collate_fn for dataloader to collate sequences of different lengths into a fixed length batch
+	Returns padded x sequence, y sequence, x lengths and y lengths of batch
+	"""
+	def __init__(self, seq_pad_value, label_pad_value=-1, label2_pad_value=-1,\
+				 ):
+		self.seq_pad_value = seq_pad_value
+		self.label_pad_value = label_pad_value
+		self.label2_pad_value = label2_pad_value
+		
+	def __call__(self, batch):
+		sorted_batch = sorted(batch, key=lambda x: x[0].shape[0], reverse=True)
+		seqs = [x[0] for x in sorted_batch]
+		seqs_padded = pad_sequence(seqs, batch_first=True, padding_value=self.seq_pad_value)
+		x_lengths = torch.LongTensor([len(x) for x in seqs])
+		
+		labels = list(map(lambda x: x[1], sorted_batch))
+		labels_padded = pad_sequence(labels, batch_first=True, padding_value=self.label_pad_value)
+		y_lengths = torch.LongTensor([len(x) for x in labels])
+		
+		labels2 = list(map(lambda x: x[2], sorted_batch))
+		labels2_padded = pad_sequence(labels2, batch_first=True, padding_value=self.label2_pad_value)
+		y2_lengths = torch.LongTensor([len(x) for x in labels2])
+		
+		return seqs_padded, labels_padded, labels2_padded, \
+				x_lengths, y_lengths, y2_lengths
+
+def get_e1e2_start(x, e1_id, e2_id):
+	try:
+		e1_e2_start = ([i for i, e in enumerate(x) if e == e1_id][0],\
+						[i for i, e in enumerate(x) if e == e2_id][0])
+	except Exception as e:
+		e1_e2_start = None
+		print(e)
+	return e1_e2_start
+
+class semeval_dataset(Dataset):
+	def __init__(self, df, tokenizer, e1_id, e2_id):
+		self.e1_id = e1_id
+		self.e2_id = e2_id
+		self.df = df
+		logger.info("Tokenizing data...")
+		self.df['input'] = self.df.progress_apply(lambda x: tokenizer.encode(x['sents']),\
+															 axis=1)
+		
+		self.df['e1_e2_start'] = self.df.progress_apply(lambda x: get_e1e2_start(x['input'],\
+													   e1_id=self.e1_id, e2_id=self.e2_id), axis=1)
+		print("\nInvalid rows/total: %d/%d" % (df['e1_e2_start'].isnull().sum(), len(df)))
+		self.df.dropna(axis=0, inplace=True)
+	
+	def __len__(self,):
+		return len(self.df)
+		
+	def __getitem__(self, idx):
+		return torch.LongTensor(self.df.iloc[idx]['input']),\
+				torch.LongTensor(self.df.iloc[idx]['e1_e2_start']),\
+				torch.LongTensor([self.df.iloc[idx]['relations_id']])
+
+def preprocess_fewrel(args, do_lower_case=True):
+	'''
+	train: train_wiki.json
+	test: val_wiki.json
+	For 5 way 1 shot
+	'''
+	def process_data(data_dict):
+		sents = []
+		labels = []
+		for relation, dataset in data_dict.items():
+			for data in dataset:
+				# first, get & verify the positions of entities
+				h_pos, t_pos = data['h'][-1], data['t'][-1]
+				
+				if not len(h_pos) == len(t_pos) == 1: # remove one-to-many relation mappings
+					continue
+				
+				h_pos, t_pos = h_pos[0], t_pos[0]
+				
+				if len(h_pos) > 1:
+					running_list = [i for i in range(min(h_pos), max(h_pos) + 1)]
+					assert h_pos == running_list
+					h_pos = [h_pos[0], h_pos[-1] + 1]
+				else:
+					h_pos.append(h_pos[0] + 1)
+				
+				if len(t_pos) > 1:
+					running_list = [i for i in range(min(t_pos), max(t_pos) + 1)]
+					assert t_pos == running_list
+					t_pos = [t_pos[0], t_pos[-1] + 1]
+				else:
+					t_pos.append(t_pos[0] + 1)
+				
+				if (t_pos[0] <= h_pos[-1] <= t_pos[-1]) or (h_pos[0] <= t_pos[-1] <= h_pos[-1]): # remove entities not separated by at least one token 
+					continue
+				
+				if do_lower_case:
+					data['tokens'] = [token.lower() for token in data['tokens']]
+				
+				# add entity markers
+				if h_pos[-1] < t_pos[0]:
+					tokens = data['tokens'][:h_pos[0]] + ['[E1]'] + data['tokens'][h_pos[0]:h_pos[1]] \
+							+ ['[/E1]'] + data['tokens'][h_pos[1]:t_pos[0]] + ['[E2]'] + \
+							data['tokens'][t_pos[0]:t_pos[1]] + ['[/E2]'] + data['tokens'][t_pos[1]:]
+				else:
+					tokens = data['tokens'][:t_pos[0]] + ['[E2]'] + data['tokens'][t_pos[0]:t_pos[1]] \
+							+ ['[/E2]'] + data['tokens'][t_pos[1]:h_pos[0]] + ['[E1]'] + \
+							data['tokens'][h_pos[0]:h_pos[1]] + ['[/E1]'] + data['tokens'][h_pos[1]:]
+				
+				assert len(tokens) == (len(data['tokens']) + 4)
+				sents.append(tokens)
+				labels.append(relation)
+		return sents, labels
+		
+	with open('./data/fewrel/train_wiki.json') as f:
+		train_data = json.load(f)
+		
+	with  open('./data/fewrel/val_wiki.json') as f:
+		test_data = json.load(f)
+	
+	train_sents, train_labels = process_data(train_data)
+	test_sents, test_labels = process_data(test_data)
+	
+	df_train = pd.DataFrame(data={'sents': train_sents, 'labels': train_labels})
+	df_test = pd.DataFrame(data={'sents': test_sents, 'labels': test_labels})
+	
+	rm = Relations_Mapper(list(df_train['labels'].unique()))
+	save_as_pickle('relations.pkl', rm)
+	df_train['labels'] = df_train.progress_apply(lambda x: rm.rel2idx[x['labels']], axis=1)
+	
+	return df_train, df_test
+
+
+# [GP][START] - added dataset number parameter.
+def load_dataloaders(args, dataset_num):
+# [GP][END] - added dataset number parameter.
+	if args.model_no == 0:
+		from ..model.BERT.tokenization_bert import BertTokenizer as Tokenizer
+		model = args.model_size#'bert-large-uncased' 'bert-base-uncased'
+		lower_case = True
+		model_name = 'BERT'
+	elif args.model_no == 1:
+		from ..model.ALBERT.tokenization_albert import AlbertTokenizer as Tokenizer
+		model = args.model_size #'albert-base-v2'
+		lower_case = True
+		model_name = 'ALBERT'
+	elif args.model_no == 2:
+		from ..model.BERT.tokenization_bert import BertTokenizer as Tokenizer
+		model = 'bert-base-uncased'
+		lower_case = False
+		model_name = 'BioBERT'
+		
+	if os.path.isfile("./data/%s_tokenizer.pkl" % model_name):
+		tokenizer = load_pickle("%s_tokenizer.pkl" % model_name)
+		logger.info("Loaded tokenizer from pre-trained blanks model")
+	else:
+		logger.info("Pre-trained blanks tokenizer not found, initializing new tokenizer...")
+		if args.model_no == 2:
+			tokenizer = Tokenizer(vocab_file='./additional_models/biobert_v1.1_pubmed/vocab.txt',
+								  do_lower_case=False)
+		else:
+			tokenizer = Tokenizer.from_pretrained(model, do_lower_case=False)
+		tokenizer.add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]', '[BLANK]'])
+
+		save_as_pickle("%s_tokenizer.pkl" % model_name, tokenizer)
+		logger.info("Saved %s tokenizer at ./data/%s_tokenizer.pkl" %(model_name, model_name))
+	
+	e1_id = tokenizer.convert_tokens_to_ids('[E1]')
+	e2_id = tokenizer.convert_tokens_to_ids('[E2]')
+	assert e1_id != e2_id != 1
+	
+	if args.task == 'semeval' or args.task == 'biocreative':
+		
+		# [GP][START] - preprocess BioCreative data. 11-26-2020
+		# added dev set 12-23-2020
+		if args.task == 'biocreative':
+			data_dir = args.train_data.rsplit('/', 1)[0]
+			relations_path = os.path.join(data_dir, 'relations_' + str(dataset_num) + '.pkl')
+			train_path = os.path.join(data_dir, 'df_train_' + str(dataset_num) + '.pkl')
+			dev_path = os.path.join(data_dir, 'df_dev_' + str(dataset_num) + '.pkl')
+			test_path = os.path.join(data_dir, 'df_test_' + str(dataset_num) + '.pkl')
+
+			if os.path.isfile(relations_path) and os.path.isfile(train_path) and os.path.isfile(dev_path) and os.path.isfile(test_path):
+				rm = pickle.load(open(relations_path, "rb"))
+				df_train = pickle.load(open(train_path, "rb"))
+				df_dev = pickle.load(open(dev_path, "rb"))
+				df_test = pickle.load(open(test_path, "rb"))
+				logger.info("Loaded preproccessed data.")
+			else:
+				df_train, df_dev, df_test, rm = preprocess_biocreative(args)
+		# [GP][END] - preprocess BioCreative data. 11-26-2020
+		else:
+			relations_path = './data/relations.pkl'
+			train_path = './data/df_train.pkl'
+			test_path = './data/df_test.pkl'
+			if os.path.isfile(relations_path) and os.path.isfile(train_path) and os.path.isfile(test_path):
+				rm = load_pickle('relations.pkl')
+				df_train = load_pickle('df_train.pkl')
+				df_test = load_pickle('df_test.pkl')
+				logger.info("Loaded preproccessed data.")
+			else:
+				if args.task == 'semeval': 
+					df_train, df_test, rm = preprocess_semeval2010_8(args)
+
+		train_set = semeval_dataset(df_train, tokenizer=tokenizer, e1_id=e1_id, e2_id=e2_id)
+		test_set = semeval_dataset(df_test, tokenizer=tokenizer, e1_id=e1_id, e2_id=e2_id)
+		train_length = len(train_set); test_length = len(test_set)
+		# [GP][START] - added dev set. 12-23-2020
+		dev_set = semeval_dataset(df_dev, tokenizer=tokenizer, e1_id=e1_id, e2_id=e2_id)
+		dev_length = len(dev_set)
+		# [GP][END] - added dev set. 12-23-2020
+		PS = Pad_Sequence(seq_pad_value=tokenizer.pad_token_id,\
+						  label_pad_value=tokenizer.pad_token_id,\
+						  label2_pad_value=-1)
+		train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, \
+								  num_workers=0, collate_fn=PS, pin_memory=False)
+		test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True, \
+								  num_workers=0, collate_fn=PS, pin_memory=False)
+		# [GP][START] - added dev set. 12-23-2020
+		dev_loader = DataLoader(dev_set, batch_size=args.batch_size, shuffle=True, \
+								  num_workers=0, collate_fn=PS, pin_memory=False)
+		# [GP][END] - added dev set. 12-23-2020
+	elif args.task == 'fewrel':
+		df_train, df_test = preprocess_fewrel(args, do_lower_case=lower_case)
+		train_loader = fewrel_dataset(df_train, tokenizer=tokenizer, seq_pad_value=tokenizer.pad_token_id,
+									  e1_id=e1_id, e2_id=e2_id)
+		train_length = len(train_loader)
+		test_loader, test_length = None, None
+	
+	# [GP][START] - added dev set. 12-23-2020	
+	return train_loader, dev_loader, test_loader, train_length, dev_length, test_length
+	# [GP][END] - added dev set. 12-23-2020
+
+
+class fewrel_dataset(Dataset):
+	def __init__(self, df, tokenizer, seq_pad_value, e1_id, e2_id):
+		self.e1_id = e1_id
+		self.e2_id = e2_id
+		self.N = 5
+		self.K = 1
+		self.df = df
+		
+		logger.info("Tokenizing data...")
+		self.df['sents'] = self.df.progress_apply(lambda x: tokenizer.encode(" ".join(x['sents'])),\
+									  axis=1)
+		self.df['e1_e2_start'] = self.df.progress_apply(lambda x: get_e1e2_start(x['sents'],\
+													   e1_id=self.e1_id, e2_id=self.e2_id), axis=1)
+		print("\nInvalid rows/total: %d/%d" % (self.df['e1_e2_start'].isnull().sum(), len(self.df)))
+		self.df.dropna(axis=0, inplace=True)
+		
+		self.relations = list(self.df['labels'].unique())
+		
+		self.seq_pad_value = seq_pad_value
+			
+	def __len__(self,):
+		return len(self.df)
+	
+	def __getitem__(self, idx):
+		target_relation = self.df['labels'].iloc[idx]
+		relations_pool = copy.deepcopy(self.relations)
+		relations_pool.remove(target_relation)
+		sampled_relation = random.sample(relations_pool, self.N - 1)
+		sampled_relation.append(target_relation)
+		
+		target_idx = self.N - 1
+	
+		e1_e2_start = []
+		meta_train_input, meta_train_labels = [], []
+		for sample_idx, r in enumerate(sampled_relation):
+			filtered_samples = self.df[self.df['labels'] == r][['sents', 'e1_e2_start', 'labels']]
+			sampled_idxs = random.sample(list(i for i in range(len(filtered_samples))), self.K)
+			
+			sampled_sents, sampled_e1_e2_starts = [], []
+			for sampled_idx in sampled_idxs:
+				sampled_sent = filtered_samples['sents'].iloc[sampled_idx]
+				sampled_e1_e2_start = filtered_samples['e1_e2_start'].iloc[sampled_idx]
+				
+				assert filtered_samples['labels'].iloc[sampled_idx] == r
+				
+				sampled_sents.append(sampled_sent)
+				sampled_e1_e2_starts.append(sampled_e1_e2_start)
+			
+			meta_train_input.append(torch.LongTensor(sampled_sents).squeeze())
+			e1_e2_start.append(sampled_e1_e2_starts[0])
+			
+			meta_train_labels.append([sample_idx])
+			
+		meta_test_input = self.df['sents'].iloc[idx]
+		meta_test_labels = [target_idx]
+		
+		e1_e2_start.append(get_e1e2_start(meta_test_input, e1_id=self.e1_id, e2_id=self.e2_id))
+		e1_e2_start = torch.LongTensor(e1_e2_start).squeeze()
+		
+		meta_input = meta_train_input + [torch.LongTensor(meta_test_input)]
+		meta_labels = meta_train_labels + [meta_test_labels]
+		meta_input_padded = pad_sequence(meta_input, batch_first=True, padding_value=self.seq_pad_value).squeeze()
+		return meta_input_padded, e1_e2_start, torch.LongTensor(meta_labels).squeeze()
