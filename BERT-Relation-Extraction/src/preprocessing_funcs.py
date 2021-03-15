@@ -4,9 +4,10 @@
 Created on Tue Nov 26 18:12:22 2019
 
 @author: weetee
-"""
 
-## Find the modifications by the tag [GP].
+modified by: Gilchan Park
+-- Find the modifications by the tag [GP].
+"""
 
 import os
 import re

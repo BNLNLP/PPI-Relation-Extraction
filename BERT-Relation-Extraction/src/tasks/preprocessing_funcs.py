@@ -30,6 +30,10 @@ from sklearn.model_selection import KFold, train_test_split
 import numpy as np
 # [GP][END] - for cross-validation. 09-29-2020
 
+# [GP][START] - pre-processed PPI benchmark datasets (AImed, BioInfer, HPRD50, IEPA, LLL). 02-19-2021
+from lxml import etree
+# [GP][END] - pre-processed PPI benchmark datasets (AImed, BioInfer, HPRD50, IEPA, LLL). 02-19-2021
+
 
 tqdm.pandas(desc="prog_bar")
 logging.basicConfig(format='%(asctime)s [%(levelname)s]: %(message)s', \
@@ -96,90 +100,7 @@ def preprocess_semeval2010_8(args):
 	return df_train, df_test, rm
 
 
-# [GP][START] - preprocess BioCreative data. 11-26-2020
-# deprecated - Sean moved an annotation file to a google doc and provided a converter (google doc txt file to tsv file). - 12-17-2020'
-'''
-def get_samples_from_csv(file, num_of_sample=None):
-	samples = []
-	with open(file, encoding='utf-8') as csv_file:
-		csv_reader = csv.reader(csv_file, delimiter=',')
-		for row in csv_reader:
-			num = row[0].strip()
-			sentence = row[2].strip()
-			relation = row[3].strip()
-			relation_type = row[4].strip()
-			comment = row[5].strip()
-			
-			sentence = sentence.replace(u"\u00A0", " ") # remove non-breaking space. e.g., non-breaking space between 'alpha4' and 'integrins' in the row 9.
-			
-			if relation == '':
-				continue
-			
-			if relation_type == '':
-				print('relation_type is None!!')
-				print(sentence)
-				continue
-				
-			if relation_type not in ['structural', 'enzyme', 'misc']:
-				print('this relation_type is undefined!!')
-				print(sentence)
-				continue
-				
-			relation = relation.split(';')
-			rel_pairs = []
-			for rel in relation:
-				print('rel:', rel.strip())
-				
-				entities = re.split(' -> | - | \? ', rel)
-				entities = [x.strip() for x in entities]
-				entities = [x.replace('_', ' ') for x in entities]
-				
-				print('entities:', entities)
-				
-				if len(entities) != 2:
-					print('this is not a pair relation:', entities)
-					continue
-
-				entity_grp_1 = [x.strip() for x in entities[0].split(',')] # e.g., FnBPA, FnBPB - fibronectin, fibrinogen, elastin
-				entity_grp_2 = [x.strip() for x in entities[1].split(',')] # e.g., FnBPA, FnBPB - fibronectin, fibrinogen, elastin
-				
-				for e1 in entity_grp_1:
-					for e2 in entity_grp_2:
-						e1 = e1.replace('[', '').replace(']', '') # [ x ] indicates a family or class of proteins named x
-						e2 = e2.replace('[', '').replace(']', '') # [ x ] indicates a family or class of proteins named x
-						
-						if e1 not in sentence or e2 not in sentence:
-							print('not existence error - e1:', e1, '/ e2:', e2)
-							continue
-						
-						if e1 == e2:
-							print('e1 and e2 are the same - e1:', e1, '/ e2:', e2)
-							continue
-					
-						tagged_sentence = sentence.replace(e1, '<e1>' + e1 + '</e1>', 1)
-						tagged_sentence = tagged_sentence.replace(e2, '<e2>' + e2 + '</e2>', 1)
-						
-						sample = []
-						sample.append(num + '\t"' + tagged_sentence + '"')
-						sample.append(relation_type + '(e1,e2)')
-						sample.append('Comment: ' + comment)
-						sample.append('\n')
-						
-						
-						# debugging
-						print(num + '\t"' + tagged_sentence + '"')
-						print(relation_type + '(e1,e2)')
-						print('Comment: ' + comment)
-						print('-------------------------------------------------\n')
-						input('enter...')
-						
-						samples.append(sample)
-						
-						if num_of_sample != None and len(samples) == num_of_sample:
-							return samples
-	
-	return samples
-'''
+# [GP][START] - preprocess BioCreative_BNL data. 12-17-2020
 
 # this is a quick and very dirty string sanatizer for creating lookup keys based
 # on the passage string
@@ -232,7 +153,7 @@ def multi_flush(sentences, selections, doc_num, text_num, pass_num, pass_total, 
 		return flush(sentences, selection, doc_num, text_num, pass_num, pass_total, annot, typ, notes, ian_comments)
 
 
-def get_samples(file, num_of_sample=None, predefined_relation_type=None):
+def get_samples_from_bnl_annotation(file, num_of_sample=None, predefined_relation_type=None):
 	passages = []
 	
 	state = 6
@@ -398,11 +319,11 @@ def get_samples(file, num_of_sample=None, predefined_relation_type=None):
 						print('e1 and e2 are the same - e1:', e1, '/ e2:', e2)
 						continue
 				
-					tagged_sentence = sentence.replace(e1, '<e1>' + e1 + '</e1>', 1)
-					tagged_sentence = tagged_sentence.replace(e2, '<e2>' + e2 + '</e2>', 1)
+					tagged_sent = sentence.replace(e1, '<e1>' + e1 + '</e1>', 1)
+					tagged_sent = tagged_sent.replace(e2, '<e2>' + e2 + '</e2>', 1)
 					
 					sample = []
-					sample.append(unique_id + '\t"' + tagged_sentence + '"')
+					sample.append(unique_id + '\t"' + tagged_sent + '"')
 					if predefined_relation_type != None:
 						sample.append(predefined_relation_type + '(e1,e2)')
 					else:
@@ -413,7 +334,7 @@ def get_samples(file, num_of_sample=None, predefined_relation_type=None):
 					
 					# debugging
 					'''
-					print(unique_id + '\t"' + tagged_sentence + '"')
+					print(unique_id + '\t"' + tagged_sent + '"')
 					print(relation_type + '(e1,e2)')
 					print('Comment: ' + comment)
 					print('-------------------------------------------------\n')
@@ -463,15 +384,17 @@ def remove_unnecessary_token(psg_data):
 	#print('After :', psg_data)
 	#if debug_flag:
 	#	input()
-	
 
-import spacy
 
-def preprocess_original_biocreative(data):
+def get_samples_from_biocreative(file, num_of_sample=None, predefined_relation_type=None):
 	"""
-	to preprocess 'PMtask_Relations_TrainingSet.json' and 'PMtask_Relations_TestSet.json' for classification task.
-	"""
+	Data preprocessing for original BioCreative PPI data ('PMtask_Relations_TrainingSet.json', 'PMtask_Relations_TestSet.json')
 	
+	TODO: Unlike other datasets, this processes the whole text rather than sentence units. If necessary, split texts into sentences using spacy or other tools.
+	"""
+	with open(file) as fp:
+		data = json.load(fp)
+
 	samples = {} # samples by documents
 	
 	for doc in data["documents"]:
@@ -638,102 +561,214 @@ def preprocess_original_biocreative(data):
 		'''
 	
 	return samples
-# [GP][END] - preprocess BioCreative data. 11-18-2020
+# [GP][END] - preprocess BioCreative_BNL data. 12-17-2020
 
-	
-def preprocess_biocreative(args):
+
+# [GP][START] - pre-processed PPI benchmark datasets (AImed, BioInfer, HPRD50, IEPA, LLL). 02-19-2021
+def get_samples_from_ppi_benchmark(file, num_of_sample=None, predefined_relation_type=None):
 	"""
-	Data preprocessing for PPI annotations by BNL (Sean and Ian) from BioCreative datasets.
+	Data preprocessing for PPI benchmark datasets (AImed, BioInfer, HPRD50, IEPA, LLL).
+	"""
+	samples = {} # samples by documents
+	
+	xml_parser = etree.XMLParser(ns_clean=True)
+	
+	tree = etree.parse(file, xml_parser)
+	root = tree.getroot()
+			
+	for doc_elem in root.findall('.//document'):
+		doc_id = doc_elem.get('id')
+		pubmed_id = doc_elem.get('origId')
+
+		for sent_elem in doc_elem.findall('.//sentence'):
+			sent_id = sent_elem.get('id')
+			sent_txt = sent_elem.get('text')
+			
+			entities = {}
+			for ent_elem in sent_elem.findall('.//entity'):
+				ent_id = ent_elem.get('id')
+				ent_seqId = ent_elem.get('seqId')
+				ent_char_offset = ent_elem.get('charOffset')
+				ent_text = ent_elem.get('text')
+				ent_type = ent_elem.get('type')
+				
+				# TODO: handle entities that consist of separate words in a sentence. e.g., "65-70,82-86" -> 'muscle actin' in "...muscle and brain actin ..."
+				if ',' in ent_char_offset:
+					continue
+					
+				start_idx = int(ent_char_offset.split('-')[0])
+				end_idx = int(ent_char_offset.split('-')[1]) + 1
+				
+				entities[ent_id] = {'start_idx': start_idx, 'end_idx': end_idx, 'text': ent_text}
+				
+				#assert ent_text == sent_txt[start_idx:end_idx]
+				
+				# debugging
+				if ent_text != sent_txt[start_idx:end_idx]:
+					print(ent_text)
+					print(sent_txt[start_idx:end_idx])
+					input('mismatch!!')
+
+			for pair_elem in sent_elem.findall('.//pair'):
+				pair_id = pair_elem.get('id')
+				pair_e1 = pair_elem.get('e1')
+				pair_e2 = pair_elem.get('e2')
+				pair_interaction = pair_elem.get('interaction')
+				
+				# TODO: handle entities that consist of separate words in a sentence.
+				if pair_e1 not in entities or pair_e2 not in entities:
+					continue
+				
+				e1_start_idx = entities[pair_e1].get('start_idx')
+				e2_start_idx = entities[pair_e2].get('start_idx')
+				e1_end_idx = entities[pair_e1].get('end_idx')
+				e2_end_idx = entities[pair_e2].get('end_idx')
+				e1_text = entities[pair_e1].get('text')
+				e2_text = entities[pair_e2].get('text')
+				
+				tagged_sent = sent_txt
+				
+				if e1_start_idx < e2_start_idx: # replace first the one located in the rear.
+					tagged_sent = tagged_sent[:e2_start_idx] + '<e2>' + e2_text + '</e2>' + tagged_sent[e2_end_idx:]
+					tagged_sent = tagged_sent[:e1_start_idx] + '<e1>' + e1_text + '</e1>' + tagged_sent[e1_end_idx:]
+				else:
+					tagged_sent = tagged_sent[:e1_start_idx] + '<e1>' + e1_text + '</e1>' + tagged_sent[e1_end_idx:]
+					tagged_sent = tagged_sent[:e2_start_idx] + '<e2>' + e2_text + '</e2>' + tagged_sent[e2_end_idx:]
+				
+				relation_type = 'pos' if pair_interaction == 'True' else 'neg'
+
+				sample = []
+				sample.append(pair_id + '\t"' + tagged_sent + '"') # use pair_id for unique id.
+				if predefined_relation_type != None:
+					sample.append(predefined_relation_type + '(e1,e2)')
+				else:
+					sample.append(relation_type + '(e1,e2)')
+				sample.append('Comment: ')
+				sample.append('\n')
+				
+				if doc_id in samples:
+					samples[doc_id].append(sample)
+				else:
+					samples[doc_id] = [sample]
+
+	return samples
+# [GP][END] - pre-processed PPI benchmark datasets (AImed, BioInfer, HPRD50, IEPA, LLL). 02-19-2021
+
+
+# [GP][START] - PPI datasets pre-processing.
+def store_data(dir, train, dev, test, idx=0):
+	# flatten list
+	train_text = [item for sublist in train for subsublist in sublist for item in subsublist] 
+	dev_text = [item for sublist in dev for subsublist in sublist for item in subsublist] 
+	test_text = [item for sublist in test for subsublist in sublist for item in subsublist]
+	
+	sents, relations, comments, blanks = process_text(train_text, 'train')
+	df_train = pd.DataFrame(data={'sents': sents, 'relations': relations})
+
+	sents, relations, comments, blanks = process_text(dev_text, 'dev')
+	df_dev = pd.DataFrame(data={'sents': sents, 'relations': relations})
+
+	sents, relations, comments, blanks = process_text(test_text, 'test')
+	df_test = pd.DataFrame(data={'sents': sents, 'relations': relations})
+
+	rm = Relations_Mapper(pd.concat([df_train['relations'], df_dev['relations'], df_test['relations']], axis=0))
+	pickle.dump(rm, open(os.path.join(dir, 'relations_' + str(idx) + '.pkl'), "wb"))
+	
+	df_test['relations_id'] = df_test.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
+	df_dev['relations_id'] = df_dev.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
+	df_train['relations_id'] = df_train.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
+	pickle.dump(df_train, open(os.path.join(dir, 'df_train_' + str(idx) + '.pkl'), "wb"))
+	pickle.dump(df_dev, open(os.path.join(dir, 'df_dev_' + str(idx) + '.pkl'), "wb"))
+	pickle.dump(df_test, open(os.path.join(dir, 'df_test_' + str(idx) + '.pkl'), "wb"))
+	
+	return df_train, df_dev, df_test, rm
+	
+
+def preprocess_ppi(args):
+	"""
+	Data preprocessing for PPI datasets.
+	
+	History:
+		- pre-processed PPI annotations by BNL (Sean and Ian) from BioCreative datasets. 11-26-2020
+		- pre-processed five PPI benchmark datasets: AImed, BioInfer, HPRD50, IEPA, LLL. 02-19-2021
 	"""
 
-	# it used to retrieve a specific number of samples here, but since it reads a text from the beginning, it doesn't get random samples.
-	# so, read the data all, and shuffle it and then get a specific number of samples. 12-23-2020
-	# use_predefined_cls is set when predefined lable is used instead of relation types from datasets. 01-06-2021
-	if args.use_predefined_cls:
-		doc_samples = get_samples(args.train_data, num_of_sample=None, predefined_relation_type='PPIm')
-	else:
-		doc_samples = get_samples(args.train_data, num_of_sample=None)
-	
-	print('num of docs:', len(doc_samples))
-	
-	keys = list(doc_samples.keys())
-	random.shuffle(keys)
-	
-	total_num = 0
+	if args.do_cross_validation:
+		# it used to retrieve a specific number of samples here, but since it reads a text from the beginning, it doesn't get random samples.
+		# so, read the data all, and shuffle it and then get a specific number of samples. 12-23-2020
+		# predefined_cls (if not set, it is None) is set when predefined lable is used instead of relation types from datasets. 01-06-2021
+		if args.task == 'BioCreative':
+			doc_samples = get_samples_from_biocreative(args.train_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
+		elif args.task == 'BioCreative_BNL':
+			doc_samples = get_samples_from_bnl_annotation(args.train_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
+		else:
+			doc_samples = get_samples_from_ppi_benchmark(args.train_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
 
-	num_of_samples_for_eval = args.num_samples
-	samples = []
-	counter = 0
-	
-	for k in keys:
-		#print(k, '/ num of samples:', len(doc_samples[k]))
-		total_num += len(doc_samples[k])
+		print('num of docs:', len(doc_samples))
 		
-		if num_of_samples_for_eval != None:
-			counter += len(doc_samples[k])
-			if counter > num_of_samples_for_eval:
-				max_idx = counter - num_of_samples_for_eval
-				samples.append(doc_samples[k][:max_idx])
-				break
-			elif counter == num_of_samples_for_eval:
-				samples.append(doc_samples[k])
-				break
+		keys = list(doc_samples.keys())
+		random.shuffle(keys)
+		
+		total_num = 0
+
+		num_of_samples_for_eval = None if args.num_samples == -1 else args.num_samples
+		samples = []
+		counter = 0
+		
+		for k in keys:
+			#print(k, '/ num of samples:', len(doc_samples[k]))
+			total_num += len(doc_samples[k])
+			
+			if num_of_samples_for_eval != None:
+				counter += len(doc_samples[k])
+				if counter > num_of_samples_for_eval:
+					max_idx = counter - num_of_samples_for_eval
+					samples.append(doc_samples[k][:max_idx])
+					break
+				elif counter == num_of_samples_for_eval:
+					samples.append(doc_samples[k])
+					break
+				else:
+					samples.append(doc_samples[k])
 			else:
 				samples.append(doc_samples[k])
+				
+		print('num of total samples:', total_num)
+
+		# debugging
+		if num_of_samples_for_eval != None and num_of_samples_for_eval != len([item for sublist in samples for item in sublist]):
+			input('sampling number is wrong!!')
+		
+		if num_of_samples_for_eval == None:
+			dir = args.train_data.rsplit('/', 1)[0] + '/all'
 		else:
-			samples.append(doc_samples[k])
-			
-	print('num of total samples:', total_num)
-	
-	# debugging
-	if num_of_samples_for_eval != None and num_of_samples_for_eval != len([item for sublist in samples for item in sublist]):
-		input('sampling number is wrong!!')
-	
-	if num_of_samples_for_eval == None:
-		data_dir = args.train_data.rsplit('/', 1)[0] + '/' + str(total_num)
-	else:
-		data_dir = args.train_data.rsplit('/', 1)[0] + '/' + str(args.num_samples)
-	
-	if args.do_cross_validation:
+			dir = args.train_data.rsplit('/', 1)[0] + '/' + str(args.num_samples)
+
 		samples = np.array(samples)
 		kfold = KFold(n_splits=args.num_of_folds, shuffle=False)
 		for idx, (train_index, test_index) in enumerate(kfold.split(samples)):
 			
-			## Train/Validation(Dev)/Test split - 70/15/15, 80/10/10, 60/20/20 ratio
-			# adjust the ratio to 70/15/15
-			test_index_adjusted = np.append(test_index, train_index[:(len(test_index)//2)])
-			dev_index = train_index[(len(test_index)//2):(len(test_index)//2) + len(test_index_adjusted)]
-			train_index_adjusted = train_index[(len(test_index)//2) + len(dev_index):]
+			## Train/Validation(Dev)/Test split - 80/10/10, 70/15/15, 60/20/20 ratio
+			if args.ratio == '80-10-10':
+				dev_index = train_index[:(len(train_index)//9)]
+				train_index = train_index[len(dev_index):]
+			elif args.ratio == '70-15-15':
+				test_index_adjusted = np.append(test_index, train_index[:(len(test_index)//2)])
+				dev_index = train_index[(len(test_index)//2):(len(test_index)//2) + len(test_index_adjusted)]
+				train_index = train_index[(len(test_index)//2) + len(dev_index):]
+				test_index = test_index_adjusted
+			elif args.ratio == '60-20-20':
+				test_index_adjusted = np.append(test_index, train_index[:len(test_index)])
+				dev_index = train_index[len(test_index):len(test_index) + len(test_index_adjusted)]
+				train_index = train_index[len(test_index) + len(dev_index):]
+				test_index = test_index_adjusted
+				
+			#print("TRAIN len:", len(train_index), "DEV len:", len(dev_index), "TEST len:", len(test_index))
+			#print("TRAIN:", train_index, "DEV:", dev_index, "TEST:", test_index)
 
-			#print("TRAIN len:", len(train_index_adjusted), "DEV len:", len(dev_index), "TEST len:", len(test_index_adjusted))
-			#print("TRAIN:", train_index_adjusted, "DEV:", dev_index, "TEST:", test_index_adjusted)
+			train, dev, test = samples[train_index], samples[dev_index], samples[test_index]
+			df_train, df_dev, df_test, rm = store_data(dir, train, dev, test, idx)
 
-			train, dev, test = samples[train_index_adjusted], samples[dev_index], samples[test_index_adjusted]
-			
-			# flatten list
-			train_text = [item for sublist in train for subsublist in sublist for item in subsublist] 
-			dev_text = [item for sublist in dev for subsublist in sublist for item in subsublist] 
-			test_text = [item for sublist in test for subsublist in sublist for item in subsublist]
-			
-			sents, relations, comments, blanks = process_text(train_text, 'train')
-			df_train = pd.DataFrame(data={'sents': sents, 'relations': relations})
-
-			sents, relations, comments, blanks = process_text(dev_text, 'dev')
-			df_dev = pd.DataFrame(data={'sents': sents, 'relations': relations})
-
-			sents, relations, comments, blanks = process_text(test_text, 'test')
-			df_test = pd.DataFrame(data={'sents': sents, 'relations': relations})
-
-			rm = Relations_Mapper(pd.concat([df_train['relations'], df_dev['relations'], df_test['relations']], axis=0))
-			pickle.dump(rm, open(os.path.join(data_dir, 'relations_' + str(idx) + '.pkl'), "wb"))
-			
-			df_test['relations_id'] = df_test.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
-			df_dev['relations_id'] = df_dev.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
-			df_train['relations_id'] = df_train.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
-			pickle.dump(df_train, open(os.path.join(data_dir, 'df_train_' + str(idx) + '.pkl'), "wb"))
-			pickle.dump(df_dev, open(os.path.join(data_dir, 'df_dev_' + str(idx) + '.pkl'), "wb"))
-			pickle.dump(df_test, open(os.path.join(data_dir, 'df_test_' + str(idx) + '.pkl'), "wb"))
-			
 			if idx == 0:
 				first_df_train = df_train
 				first_df_dev = df_dev
@@ -773,107 +808,53 @@ def preprocess_biocreative(args):
 
 		logger.info("Finished and saved!")
 		
-	
 		#input('enter..')
 		
 		return first_df_train, first_df_dev, first_df_test, first_rm # return the first CV set.
-		
-		''' deprecated
-		# split train/test into 8:2
-		split_offset = int((((len(text)/4)//10)*8)*4)
-		train_text = text[:split_offset]
-		test_text = text[split_offset:]
 
-		sents, relations, comments, blanks = process_text(train_text, 'train')
-		df_train = pd.DataFrame(data={'sents': sents, 'relations': relations})
-		
-		sents, relations, comments, blanks = process_text(test_text, 'test')
-		df_test = pd.DataFrame(data={'sents': sents, 'relations': relations})
-		
-		rm = Relations_Mapper(df_train['relations'])
-		pickle.dump(rm, open('./data/BioCreative/relations.pkl', "wb"))
-		
-		df_test['relations_id'] = df_test.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
-		df_train['relations_id'] = df_train.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
-		pickle.dump(df_train, open('./data/BioCreative/df_train.pkl', "wb"))
-		pickle.dump(df_test, open('./data/BioCreative/df_test.pkl', "wb"))	
-				
-		logger.info("Finished and saved!")
-				
-		return df_train, df_test, rm
-		'''	
 	else:
-		
-		
-		
-		
-		
-		train_samples = []
-		if args.train_data.endswith('PMtask_Relations_TrainingSet.json'):
-			with open(args.train_data) as fp:
-				data = json.load(fp)
-			train_samples = preprocess_original_biocreative(data)
+		if args.task == 'BioCreative':
+			train_samples = get_samples_from_biocreative(args.train_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
+			if args.train_data != args.test_data:
+				test_samples = get_samples_from_biocreative(args.test_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
+		elif args.task == 'BioCreative_BNL':
+			train_samples = get_samples_from_bnl_annotation(args.train_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
+			if args.train_data != args.test_data:
+				test_samples = get_samples_from_bnl_annotation(args.test_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
+		else:
+			train_samples = get_samples_from_ppi_benchmark(args.train_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
+			if args.train_data != args.test_data:
+				test_samples = get_samples_from_ppi_benchmark(args.test_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
 
 		keys = list(train_samples.keys())
 		random.shuffle(keys)
 		train_samples = [train_samples[k] for k in keys]
 		
-		
-		
-		
-		train = train_samples
-		
-		
-		
-		
+		if args.train_data == args.test_data:
+			## Train/Validation(Dev)/Test split - 80/10/10 ratio
+			split_idx_1 = int(0.8 * len(train_samples))
+			split_idx_2 = int(0.9 * len(train_samples))
 
-		test_samples = []
-		if args.test_data.endswith('PMtask_Relation_TestSet.json'):
-			with open(args.test_data) as fp:
-				data = json.load(fp)
+			train, dev, test = train_samples[:split_idx_1], train_samples[split_idx_1:split_idx_2], train_samples[split_idx_2:]
+		else:
+			assert len(test_samples) != 0
 			
-			#nlp = spacy.load("en_core_web_lg", disable=["tagger", "ner"])
-			#test_samples = preprocess_original_biocreative(data, nlp)
-			test_samples = preprocess_original_biocreative(data)
-		
-		assert len(test_samples) != 0
-		
-		keys = list(test_samples.keys())
-		random.shuffle(keys)
-		test_samples = [test_samples[k] for k in keys]
+			keys = list(test_samples.keys())
+			random.shuffle(keys)
+			test_samples = [test_samples[k] for k in keys]
 
-		split_idx = len(test_samples)//3 # split data into dev and test data by the ratio 3:7
-		
-		dev = test_samples[:split_idx]
-		test = test_samples[split_idx:]
-
-		# flatten list
-		train_text = [item for sublist in train for subsublist in sublist for item in subsublist] 
-		dev_text = [item for sublist in dev for subsublist in sublist for item in subsublist] 
-		test_text = [item for sublist in test for subsublist in sublist for item in subsublist]
-		
-		sents, relations, comments, blanks = process_text(train_text, 'train')
-		df_train = pd.DataFrame(data={'sents': sents, 'relations': relations})
-
-		sents, relations, comments, blanks = process_text(dev_text, 'dev')
-		df_dev = pd.DataFrame(data={'sents': sents, 'relations': relations})
-
-		sents, relations, comments, blanks = process_text(test_text, 'test')
-		df_test = pd.DataFrame(data={'sents': sents, 'relations': relations})
-
-		rm = Relations_Mapper(pd.concat([df_train['relations'], df_dev['relations'], df_test['relations']], axis=0))
-		pickle.dump(rm, open(os.path.join(data_dir, 'relations_0.pkl'), "wb"))
-		
-		df_test['relations_id'] = df_test.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
-		df_dev['relations_id'] = df_dev.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
-		df_train['relations_id'] = df_train.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
-		pickle.dump(df_train, open(os.path.join(data_dir, 'df_train_0.pkl'), "wb"))
-		pickle.dump(df_dev, open(os.path.join(data_dir, 'df_dev_0.pkl'), "wb"))
-		pickle.dump(df_test, open(os.path.join(data_dir, 'df_test_0.pkl'), "wb"))	
+			split_idx = len(test_samples)//3 # split data into dev and test data by the ratio 3:7
+			
+			train, dev, test = train_samples, test_samples[:split_idx], test_samples[split_idx:]
+			
+		# TODO: take into account the number of samples like the CV above.
+		dir = args.train_data.rsplit('/', 1)[0] + '/all'
+			
+		df_train, df_dev, df_test, rm = store_data(dir, train, dev, test, 0)
 		
 		return df_train, df_dev, df_test, rm
-# [GP][END] - preprocess BioCreative data. 11-26-2020	
-	
+# [GP][END] - PPI datasets pre-processing.
+
 
 class Relations_Mapper(object):
 	def __init__(self, relations):
@@ -926,7 +907,7 @@ def get_e1e2_start(tokenizer, x, e1_id, e2_id):
 		e1_e2_start = None
 		print(e)
 	
-
+	# [GP][START]
 	# debugging
 	'''
 	print('e1_id:', e1_id, '/ e2_id:', e2_id)
@@ -937,6 +918,7 @@ def get_e1e2_start(tokenizer, x, e1_id, e2_id):
 		print('ERRORRRRRRRRRRRRRRRRRRRRRRRR!!!!')
 		input('enter...')
 	'''
+	# [GP][END]
 
 	return e1_e2_start
 
@@ -1073,12 +1055,33 @@ def load_dataloaders(args, dataset_num):
 	e2_id = tokenizer.convert_tokens_to_ids('[E2]')
 	assert e1_id != e2_id != 1
 	
-	if args.task == 'semeval' or args.task == 'biocreative':
-		
-		# [GP][START] - preprocess BioCreative data. 11-26-2020
-		# 			  - added dev set. 12-23-2020
-		if args.task == 'biocreative':
-			data_dir = args.train_data.rsplit('/', 1)[0] + '/' + str(args.num_samples)
+	if args.task == 'fewrel':
+		df_train, df_test = preprocess_fewrel(args, do_lower_case=lower_case)
+		train_loader = fewrel_dataset(df_train, tokenizer=tokenizer, seq_pad_value=tokenizer.pad_token_id,
+									  e1_id=e1_id, e2_id=e2_id)
+		train_length = len(train_loader)
+		test_loader, test_length = None, None
+	else:
+		if args.task == 'semeval':
+			relations_path = './data/relations.pkl'
+			train_path = './data/df_train.pkl'
+			test_path = './data/df_test.pkl'
+			if os.path.isfile(relations_path) and os.path.isfile(train_path) and os.path.isfile(test_path):
+				rm = load_pickle('relations.pkl')
+				df_train = load_pickle('df_train.pkl')
+				df_test = load_pickle('df_test.pkl')
+				logger.info("Loaded preproccessed data.")
+			else:
+				df_train, df_test, rm = preprocess_semeval2010_8(args)
+		else:
+			# [GP][START] - PPI datasets pre-processing.
+			#			  - pre-processed BioCreative_BNL data. 11-26-2020
+			# 			  - added dev set. 12-23-2020
+			#			  - pre-processed AImed, BioInfer, HPRD50, IEPA, LLL. 02-19-2021
+			if args.num_samples == -1:
+				data_dir = args.train_data.rsplit('/', 1)[0] + '/all'
+			else:
+				data_dir = args.train_data.rsplit('/', 1)[0] + '/' + str(args.num_samples)
 	
 			if not os.path.exists(data_dir):
 				os.makedirs(data_dir)
@@ -1095,20 +1098,8 @@ def load_dataloaders(args, dataset_num):
 				df_test = pickle.load(open(test_path, "rb"))
 				logger.info("Loaded preproccessed data.")
 			else:
-				df_train, df_dev, df_test, rm = preprocess_biocreative(args)
-		# [GP][END] - preprocess BioCreative data. 11-26-2020
-		else:
-			relations_path = './data/relations.pkl'
-			train_path = './data/df_train.pkl'
-			test_path = './data/df_test.pkl'
-			if os.path.isfile(relations_path) and os.path.isfile(train_path) and os.path.isfile(test_path):
-				rm = load_pickle('relations.pkl')
-				df_train = load_pickle('df_train.pkl')
-				df_test = load_pickle('df_test.pkl')
-				logger.info("Loaded preproccessed data.")
-			else:
-				if args.task == 'semeval': 
-					df_train, df_test, rm = preprocess_semeval2010_8(args)
+				df_train, df_dev, df_test, rm = preprocess_ppi(args)
+			# [GP][END] - PPI datasets pre-processing.
 
 		train_set = semeval_dataset(df_train, tokenizer=tokenizer, e1_id=e1_id, e2_id=e2_id)
 		test_set = semeval_dataset(df_test, tokenizer=tokenizer, e1_id=e1_id, e2_id=e2_id)
@@ -1126,14 +1117,8 @@ def load_dataloaders(args, dataset_num):
 								  num_workers=0, collate_fn=PS, pin_memory=False)
 		# [GP][START] - added dev set. 12-23-2020
 		dev_loader = DataLoader(dev_set, batch_size=args.batch_size, shuffle=True, \
-								  num_workers=0, collate_fn=PS, pin_memory=False)
+								num_workers=0, collate_fn=PS, pin_memory=False)
 		# [GP][END] - added dev set. 12-23-2020
-	elif args.task == 'fewrel':
-		df_train, df_test = preprocess_fewrel(args, do_lower_case=lower_case)
-		train_loader = fewrel_dataset(df_train, tokenizer=tokenizer, seq_pad_value=tokenizer.pad_token_id,
-									  e1_id=e1_id, e2_id=e2_id)
-		train_length = len(train_loader)
-		test_loader, test_length = None, None
 	
 	# [GP][START] - added dev set. 12-23-2020	
 	return train_loader, dev_loader, test_loader, train_length, dev_length, test_length
