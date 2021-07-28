@@ -4,6 +4,9 @@
 Created on Thu Nov 28 09:37:26 2019
 
 @author: weetee
+
+modified by: Gilchan Park
+-- Find the modifications by the tag [GP].
 """
 import os
 import math
@@ -14,7 +17,6 @@ from seqeval.metrics import precision_score, recall_score, f1_score
 import logging
 from tqdm import tqdm
 
-## Find the modifications by the tag [GP].
 
 logging.basicConfig(format='%(asctime)s [%(levelname)s]: %(message)s', \
                     datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO)

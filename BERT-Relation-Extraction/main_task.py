@@ -27,16 +27,25 @@ logger = logging.getLogger('__file__')
 
 if __name__ == "__main__":
 	parser = ArgumentParser()
-	# [GP][START] - BioCreative added. 11-26-2020
-	#			  - AImed, BioInfer, HPRD50, IEPA, LLL added. 02-19-2021
-	parser.add_argument("--task", type=str, default='semeval', help='semeval, fewrel, BioCreative, BioCreative_BNL, AImed, BioInfer, HPRD50, IEPA, LLL, AImed_BioInfer_HPRD50_IEPA_LLL')
-	# [GP][END] - BioCreative added. 11-26-2020
+	# [GP][START] - added PPI tasks.
+	#			  - added BioCreative, BioCreative_type. 11-26-2020
+	#			  - added PPIbenchmark, PPIbenchmark_type incl. AImed, BioInfer, HPRD50, IEPA, LLL. 02-19-2021
+	parser.add_argument("--task", type=str, default='semeval', help='semeval, fewrel, \
+																	 BioCreative, BioCreative_type, \
+																	 PPIbenchmark, PPIbenchmark_type')
+	# [GP][END] - added PPI tasks.
 	parser.add_argument("--train_data", type=str, default='./data/SemEval2010_task8_all_data/SemEval2010_task8_training/TRAIN_FILE.TXT', \
 						help="training data .txt file path")
 	parser.add_argument("--test_data", type=str, default='./data/SemEval2010_task8_all_data/SemEval2010_task8_testing_keys/TEST_FILE_FULL.TXT', \
 						help="test data .txt file path")
 	parser.add_argument("--use_pretrained_blanks", type=int, default=0, help="0: Don't use pre-trained blanks model, 1: use pre-trained blanks model")
-	parser.add_argument("--num_classes", type=int, default=19, help='number of relation classes')
+	parser.add_argument("--num_classes", type=int, default=3, help='number of relation classes')
+	
+	# [GP][START] - added a parameter to get a list of classes. 04-02-2021
+	#               explicitly define classes since a dataset may not contain all classes in which case Relation_Mapper assigns overlapped relation ids.
+	parser.add_argument("--classes", nargs="+", default=["enzyme", "structural", "negative"], help="a list of classes.")
+	# [GP][END] - added a parameter to get a list of classes. 04-02-2021
+	
 	parser.add_argument("--batch_size", type=int, default=32, help="Training batch size")
 	parser.add_argument("--gradient_acc_steps", type=int, default=2, help="No. of steps of gradient accumulation")
 	parser.add_argument("--max_norm", type=float, default=1.0, help="Clipped gradient norm")
@@ -46,47 +55,42 @@ if __name__ == "__main__":
 	parser.add_argument("--model_no", type=int, default=0, help='''Model ID: 0 - BERT\n
 																			 1 - ALBERT\n
 																			 2 - BioBERT''')
-	parser.add_argument("--model_size", type=str, default='bert-base-uncased', help="For BERT: 'bert-base-uncased', \
-																								'bert-large-uncased',\
-																					For ALBERT: 'albert-base-v2',\
-																								'albert-large-v2'\
-																					For BioBERT: 'bert-base-uncased' (biobert_v1.1_pubmed)")
+	parser.add_argument("--model_size", type=str, default='bert-base-uncased', help="For BERT:    'bert-base-uncased', \
+																								  'bert-large-uncased',\
+																					 For ALBERT:  'albert-base-v2',\
+																								  'albert-large-v2'\
+																					 For BioBERT: 'bert-base-uncased' (biobert_v1.1_pubmed)")
 	parser.add_argument("--train", type=int, default=1, help="0: Don't train, 1: train")
 	parser.add_argument("--infer", type=int, default=1, help="0: Don't infer, 1: Infer")
 	
 	# [GP][START] - arguments for cross-validation. 11-29-2020
-	parser.add_argument("--num_samples", type=int, default=-1, help="No of samples for evaluation. -1 means to use all samples.")
+	parser.add_argument("--num_samples", type=int, default=-1, help="Number of samples for the model. -1 means to use all samples.")
 	parser.add_argument("--do_cross_validation", action="store_true", help="Whether to use cross-validation for evaluation.")
 	parser.add_argument("--num_of_folds", default=10, type=int, help="The number of folds for the cross validation.")
-	parser.add_argument("--ratio", type=str, default='60-20-20', help="train/dev/test ratio: 80-10-10, 70-15-15, 60-20-20")
+	parser.add_argument("--ratio", type=str, default='k-folds', help="k-folds generates train-test splits given the number of given folds. \
+																	  if you want to use validation (development) set, use one of the following ratios: \
+																	  train/dev/test ratio: 80-10-10, 70-15-15, 60-20-20")
 	parser.add_argument("--eval_value", type=str, help="best: get the best value among epochs, last: get the value of last epoch")
 	parser.add_argument("--do_one_class_classification", action="store_true", help="Whether to use sigmoid for outputs rather than softmax. \
 																					this is used for testing BioCreative 'PPIm' label.")
 	parser.add_argument("--threshold", default=0.5, type=float, help="threshold value to determine one-class outputs. \
-																	  this is used together with do_one_class_classification.")																	
+																	  this is used together with do_one_class_classification.")
 	parser.add_argument("--predefined_cls", type=int, help="predefined labels such as PPIm.")
 	parser.add_argument("--result_dir", type=str, help="result directory path")
 	# [GP][END] - arguments for cross-validation. 11-29-2020
 	
 	# [GP][START] - added relation mapper path for infer task. 02-27-2021
-	parser.add_argument("--rm_file", type=str, help="(for infer) relation mapper path")	
+	parser.add_argument("--rm_file", type=str, help="(for infer) relation mapper path")
 	# [GP][END] - added relation mapper path for infer task. 02-27-2021
 	
 	args = parser.parse_args()
-	
+
 	if (args.train == 1) and (args.task != 'fewrel'):
 		# [GP][START] - set the number of datasets for training and evaluation, and save CV results. 11-29-2020
 		num_of_datasets = 1 # if not CV, there is only one dataset.
 		if args.do_cross_validation:
 			num_of_datasets = args.num_of_folds
-		
-		if args.num_samples == -1:
-			if not os.path.exists(args.result_dir + '/all'):
-				os.makedirs(args.result_dir + '/all')
-		else:
-			if not os.path.exists(args.result_dir + '/' + str(args.num_samples)):
-				os.makedirs(args.result_dir + '/' + str(args.num_samples))
-			
+	
 		if args.model_no == 0:
 			result_file = 'BERT_'
 		elif args.model_no == 1:
@@ -100,8 +104,12 @@ if __name__ == "__main__":
 			result_file += 'without_MTB_cv_result.txt'
 		
 		if args.num_samples == -1:
+			if not os.path.exists(args.result_dir + '/all'):
+				os.makedirs(args.result_dir + '/all')
 			result_file = os.path.join(args.result_dir + '/all', result_file)
 		else:
+			if not os.path.exists(args.result_dir + '/' + str(args.num_samples)):
+				os.makedirs(args.result_dir + '/' + str(args.num_samples))
 			result_file = os.path.join(args.result_dir + '/' + str(args.num_samples), result_file)
 		
 		if args.eval_value == 'best':

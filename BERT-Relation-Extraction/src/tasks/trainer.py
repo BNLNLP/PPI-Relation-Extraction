@@ -27,6 +27,11 @@ logging.basicConfig(format='%(asctime)s [%(levelname)s]: %(message)s', \
                     datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO)
 logger = logging.getLogger(__file__)
 
+# [GP][START] - Set seed before initializing model for reproducibility. 03-22-2021
+torch.manual_seed(0)
+# [GP][END] - Set seed before initializing model for reproducibility. 03-22-2021
+
+
 # [GP][START] - added dataset number parameter.
 def train_and_fit(args, dataset_num):
 # [GP][END] - added dataset number parameter.
@@ -41,7 +46,7 @@ def train_and_fit(args, dataset_num):
 	# [GP][START] - added CV set number for CV.
 	# 			  - added dev set. 12-23-2020
 	train_loader, dev_loader, test_loader, train_len, dev_len, test_len = load_dataloaders(args, dataset_num)
-	# [GP][END] - add CV set number for CV.
+	# [GP][END] - added CV set number for CV.
 	logger.info("Loaded %d Training samples." % train_len)
 	
 	if args.model_no == 0:
@@ -159,7 +164,24 @@ def train_and_fit(args, dataset_num):
 			x, e1_e2_start, labels, _,_,_ = data
 			attention_mask = (x != pad_id).float()
 			token_type_ids = torch.zeros((x.shape[0], x.shape[1])).long()
-
+			
+			
+			# [GP]
+			print(net)
+			print(type(data))
+			print('data:', data)
+			print('x:', x)
+			print('e1_e2_start:', e1_e2_start)
+			print('labels:', labels)
+			print('attention_mask:', attention_mask)
+			print('token_type_ids:', token_type_ids)
+			
+			#for i in x:
+			#	print(tokenizer.decode(i))
+			#	print(tokenizer.convert_ids_to_tokens(i))
+			#input('enter.')
+			
+			
 			if cuda:
 				x = x.cuda()
 				labels = labels.cuda()
@@ -168,6 +190,17 @@ def train_and_fit(args, dataset_num):
 				
 			classification_logits = net(x, token_type_ids=token_type_ids, attention_mask=attention_mask, Q=None,\
 										e1_e2_start=e1_e2_start)
+			
+			
+			print('classification_logits.shape:', classification_logits.shape)
+			print('classification_logits:', classification_logits)
+			print('labels:', labels)
+			print('labels.squeeze(1).shape:', labels.squeeze(1).shape)
+			print('labels.squeeze(1):', labels.squeeze(1))
+				
+			input('enter.')
+			
+			
 			
 			#return classification_logits, labels, net, tokenizer # for debugging now
 			
@@ -234,10 +267,15 @@ def train_and_fit(args, dataset_num):
 		scheduler.step()
 		
 		# [GP][START] - use dev set during training. 12-23-2020, added one-class classification parameters. 01-06-2021
-		#results = evaluate_results(net, test_loader, pad_id, cuda)
-		results = evaluate_results(net, dev_loader, pad_id, cuda, \
-								   do_one_cls_classification=args.do_one_class_classification, \
-								   threshold=args.threshold)
+		if dev_loader is not None:
+			results = evaluate_results(net, dev_loader, pad_id, cuda, \
+									   do_one_cls_classification=args.do_one_class_classification, \
+									   threshold=args.threshold)
+		else:
+			#results = evaluate_results(net, test_loader, pad_id, cuda)
+			results = evaluate_results(net, test_loader, pad_id, cuda, \
+									   do_one_cls_classification=args.do_one_class_classification, \
+									   threshold=args.threshold)
 		# [GP][END] - use dev set during training. 12-23-2020, added one-class classification parameters. 01-06-2021
 		losses_per_epoch.append(sum(losses_per_batch)/len(losses_per_batch))
 		accuracy_per_epoch.append(sum(accuracy_per_batch)/len(accuracy_per_batch))

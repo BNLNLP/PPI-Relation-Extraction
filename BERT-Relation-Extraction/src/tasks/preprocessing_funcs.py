@@ -10,6 +10,7 @@ modified by: Gilchan Park
 """
 
 import os
+import sys
 import re
 import random
 import copy
@@ -47,7 +48,7 @@ def process_text(text, mode='train'):
 		relation = text[4*i + 1]
 		comment = text[4*i + 2]
 		blank = text[4*i + 3]
-
+	
 		# check entries
 		# [GP][START] - don't check index numbers since BioCreative may have different numbers. 11-27-2020
 		'''
@@ -60,11 +61,14 @@ def process_text(text, mode='train'):
 		assert re.match("^Comment", comment)
 		assert len(blank) == 1
 		
-		sent = re.findall("\"(.+)\"", sent)[0]
+		sent = re.findall("\"(.+)\"", sent)[0]	
 		sent = re.sub('<e1>', '[E1]', sent)
 		sent = re.sub('</e1>', '[/E1]', sent)
 		sent = re.sub('<e2>', '[E2]', sent)
 		sent = re.sub('</e2>', '[/E2]', sent)
+		
+		comment = re.sub('Comment:\s*', '', comment)
+
 		sents.append(sent); relations.append(relation), comments.append(comment); blanks.append(blank)
 	return sents, relations, comments, blanks
 
@@ -100,7 +104,7 @@ def preprocess_semeval2010_8(args):
 	return df_train, df_test, rm
 
 
-# [GP][START] - preprocess BioCreative_BNL data. 12-17-2020
+# [GP][START] - BioCreative_type data pre-processing. 12-17-2020
 
 # this is a quick and very dirty string sanatizer for creating lookup keys based
 # on the passage string
@@ -144,7 +148,7 @@ def flush(sentences, selection, doc_num, text_num, pass_num, pass_total, annot, 
 
 	#print( "\t".join( [row, doc_num, text_num, pass_num + "/" + pass_total, passage, selected_sentence, annot, typ, notes, ian_comments ] ) )
 
-	return [row, doc_num, text_num, pass_num + "/" + pass_total, selected_sentence, annot, typ, notes]
+	return [row, doc_num, text_num, selection, pass_num + "/" + pass_total, selected_sentence, annot, typ, notes]
 
 
 # multi_flush handles multiple selected line numbers ( ie 1 & 2 )
@@ -153,7 +157,13 @@ def multi_flush(sentences, selections, doc_num, text_num, pass_num, pass_total, 
 		return flush(sentences, selection, doc_num, text_num, pass_num, pass_total, annot, typ, notes, ian_comments)
 
 
-def get_samples_from_bnl_annotation(file, num_of_sample=None, predefined_relation_type=None):
+def get_samples_from_biocreative_type(file, num_of_sample=None, predefined_relation_type=None):
+	"""
+	Data preprocessing for BioCreative Typed data (annotated by BNL)
+	
+	BioCreative data only indicates whether two proteins interact or not, and it doesn't have types of relation information.
+	BioCreative_type data has types of relations such as 'enzyme', 'structural'.
+	"""
 	passages = []
 	
 	state = 6
@@ -263,15 +273,17 @@ def get_samples_from_bnl_annotation(file, num_of_sample=None, predefined_relatio
 		passages.append(multi_flush(sentences, selection, doc_num, text_num, pass_num, pass_total, annot, typ, notes, ian_comments))
 
 	samples = {} # samples by documents
+	unique_sents = set() # used to remove duplicates
 
 	for passage in passages:
-		# passage -> [row, doc_num, text_num, pass_num + "/" + pass_total, selected_sentence, annot, typ, notes]
+		# passage -> [row, doc_num, text_num, sentence_num, pass_num + "/" + pass_total, selected_sentence, annot, typ, notes]
+
 		doc_num = passage[1]
-		unique_id = passage[1] + '_' + passage[2]
-		sentence = passage[4].strip()
-		relation = passage[5].strip()
-		relation_type = passage[6].strip()
-		comment = passage[7].strip()
+		unique_id = passage[1] + '_' + passage[2] + '_' + passage[3]
+		sentence = passage[5].strip()
+		relation = passage[6].strip()
+		relation_type = passage[7].strip()
+		comment = passage[8].strip()
 		
 		sentence = sentence.replace(u"\u00A0", " ") # remove non-breaking space. e.g., non-breaking space between 'alpha4' and 'integrins' in the row 9.
 		
@@ -279,13 +291,11 @@ def get_samples_from_bnl_annotation(file, num_of_sample=None, predefined_relatio
 			continue
 		
 		if relation_type == '':
-			print('relation_type is None!!')
-			print(sentence)
+			logger.info('relation_type is None: %s', sentence)
 			continue
 			
 		if relation_type not in ['structural', 'enzyme']: # exclude 'misc' for now since they are very few (only 3 as of 12-17-2020)
-			print('this relation_type is undefined!!')
-			print(sentence)
+			logger.info('this relation_type is undefined: %s', sentence)
 			continue
 			
 		relation = relation.split(';')
@@ -300,7 +310,7 @@ def get_samples_from_bnl_annotation(file, num_of_sample=None, predefined_relatio
 			#print('entities:', entities)
 			
 			if len(entities) != 2:
-				print('this is not a pair relation:', entities)
+				logger.info('this is not a pair relation: %s', ' '.join(entities))
 				continue
 
 			entity_grp_1 = [x.strip() for x in entities[0].split(',')] # e.g., FnBPA, FnBPB - fibronectin, fibrinogen, elastin
@@ -308,19 +318,64 @@ def get_samples_from_bnl_annotation(file, num_of_sample=None, predefined_relatio
 			
 			for e1 in entity_grp_1:
 				for e2 in entity_grp_2:
-					e1 = e1.replace('[', '').replace(']', '') # [ x ] indicates a family or class of proteins named x
-					e2 = e2.replace('[', '').replace(']', '') # [ x ] indicates a family or class of proteins named x
+					# [ x ] indicates a family or class of proteins named x
+					e1 = re.sub(r'\[\s*', '', e1)
+					e1 = re.sub(r'\s*\]', '', e1)
+					e2 = re.sub(r'\[\s*', '', e2)
+					e2 = re.sub(r'\s*\]', '', e2)
 					
 					if e1 not in sentence or e2 not in sentence:
-						print('not existence error - e1:', e1, '/ e2:', e2)
+						logger.info('not existence error - e1: %s / e2: %s', e1, e2)
 						continue
 					
 					if e1 == e2:
-						print('e1 and e2 are the same - e1:', e1, '/ e2:', e2)
+						logger.info('e1 and e2 are the same - e1: %s / e2: %s', e1, e2)
 						continue
-				
+					
+					# TODO: fix this problem! this sentence is the only replacement error in the data. 04-29-2021
+					'''
+					e.g., 
+					sentence: Yeast epiarginase regulation, an enzyme-enzyme activity control: identification of residues of ornithine carbamoyltransferase and arginase responsible for enzyme catalytic and regulatory activities.
+					tagged_sent: Yeast epi<e2>arginase</e2> regulation, an enzyme-enzyme activity control: identification of residues of <e1>ornithine carbamoyltransferase</e1> and arginase responsible for enzyme catalytic and regulatory activities.
+					e1: ornithine carbamoyltransferase / e2: arginase
+					'''
 					tagged_sent = sentence.replace(e1, '<e1>' + e1 + '</e1>', 1)
-					tagged_sent = tagged_sent.replace(e2, '<e2>' + e2 + '</e2>', 1)
+					if sentence.startswith('Yeast epiarginase regulation,'):
+						tagged_sent = tagged_sent.replace('and arginase responsible', 'and <e2>arginase</e2> responsible', 1)
+					else:
+						tagged_sent = tagged_sent.replace(e2, '<e2>' + e2 + '</e2>', 1)
+					# debug
+					'''
+					if (tagged_sent.index('<e1>')-1 >= 0 and bool(re.match('^[a-zA-Z0-9]+$', tagged_sent[tagged_sent.index('<e1>')-1]))) or \
+					   (tagged_sent.index('<e2>')-1 >= 0 and bool(re.match('^[a-zA-Z0-9]+$', tagged_sent[tagged_sent.index('<e2>')-1]))):
+						print('sentence:', sentence)
+						print('tagged_sent:', tagged_sent)
+						print('e1:', e1, '/ e2:', e2)
+						print(tagged_sent[tagged_sent.index('<e1>')-1])
+						print(tagged_sent[tagged_sent.index('<e2>')-1])
+						input('enter...')
+					'''
+
+					# TODO: handle the cases where entities are overlapped.
+					e1_s_idx = tagged_sent.index('<e1>')
+					e1_e_idx = tagged_sent.index('</e1>')
+					e2_s_idx = tagged_sent.index('<e2>')
+					e2_e_idx = tagged_sent.index('</e2>')
+					
+					if (e1_s_idx > e2_s_idx and e1_s_idx < e2_e_idx) or (e2_s_idx > e1_s_idx and e2_s_idx < e1_e_idx):
+						logger.info('entities are overlapped: %s', tagged_sent)
+						continue
+						
+					if tagged_sent in unique_sents: # all sentences with tags must be unique. this is just in case.
+						'''
+						duplicate error example: TODO: deal with directional relation. For now, '->' and '-' are treated equally.
+							doc 283 text # 568  passage 2/2:
+							annot:  Relaxin-3 -> RXFP3, RXFP4, RXFP1; Relaxin-3 - RXFP3, RXFP4, RXFP1
+						'''
+						logger.info('duplicate sent: %s', tagged_sent)
+						continue
+					else:
+						unique_sents.add(tagged_sent)
 					
 					sample = []
 					sample.append(unique_id + '\t"' + tagged_sent + '"')
@@ -328,7 +383,8 @@ def get_samples_from_bnl_annotation(file, num_of_sample=None, predefined_relatio
 						sample.append(predefined_relation_type + '(e1,e2)')
 					else:
 						sample.append(relation_type + '(e1,e2)')
-					sample.append('Comment: ' + comment)
+					#sample.append('Comment: ' + comment)
+					sample.append('Comment: ' + unique_id) # added sentence ids to be used to group the same sentences for different pairs in joint ner ppi learning. 05-01-2021
 					sample.append('\n')
 					
 					
@@ -396,6 +452,7 @@ def get_samples_from_biocreative(file, num_of_sample=None, predefined_relation_t
 		data = json.load(fp)
 
 	samples = {} # samples by documents
+	unique_texts = set() # used to remove duplicates
 	
 	for doc in data["documents"]:
 		psg_data_list = []
@@ -497,7 +554,7 @@ def get_samples_from_biocreative(file, num_of_sample=None, predefined_relation_t
 						g2_offset = g2e[3]
 						g2_length = g2e[4]
 						
-						# TODO: handle self PPIs. handle cases where a gene is inside the other gene.
+						# TODO: handle self PPIs and cases where entities are overlapped.
 						''' E.g., PMtask_Relation_TestSet.json: 
 								  doc - "id": "7530509",
 									  "infons": {
@@ -529,6 +586,12 @@ def get_samples_from_biocreative(file, num_of_sample=None, predefined_relation_t
 						else:
 							tagged_text = tagged_text[:g1_offset] + '<e1>' + g1_text + '</e1>' + tagged_text[g1_offset + g1_length:]
 							tagged_text = tagged_text[:g2_offset] + '<e2>' + g2_text + '</e2>' + tagged_text[g2_offset + g2_length:]
+						
+						if tagged_text in unique_texts:
+							print('tagged_text sent:', tagged_text)
+							continue
+						else:
+							unique_texts.add(tagged_text)
 							
 						sample = []
 						sample.append(doc_id + '_' + rel_id + '\t"' + tagged_text + '"')
@@ -561,15 +624,16 @@ def get_samples_from_biocreative(file, num_of_sample=None, predefined_relation_t
 		'''
 	
 	return samples
-# [GP][END] - preprocess BioCreative_BNL data. 12-17-2020
+# [GP][END] - BioCreative_type data pre-processing. 12-17-2020
 
 
-# [GP][START] - pre-processed PPI benchmark datasets (AImed, BioInfer, HPRD50, IEPA, LLL). 02-19-2021
+# [GP][START] - PPI benchmark datasets pre-processing. 02-19-2021
 def get_samples_from_ppi_benchmark(file, num_of_sample=None, predefined_relation_type=None):
 	"""
 	Data preprocessing for PPI benchmark datasets (AImed, BioInfer, HPRD50, IEPA, LLL).
 	"""
 	samples = {} # samples by documents
+	unique_sents = set() # used to remove duplicates
 	
 	xml_parser = etree.XMLParser(ns_clean=True)
 	
@@ -626,8 +690,42 @@ def get_samples_from_ppi_benchmark(file, num_of_sample=None, predefined_relation
 				e1_text = entities[pair_e1].get('text')
 				e2_text = entities[pair_e2].get('text')
 				
-				tagged_sent = sent_txt
 				
+				# TODO: handle self PPIs and cases where entities are overlapped.
+				''' E.g., AImed.xml: 
+						<sentence id="AIMed.d198.s1687" seqId="s1687" text="Mutagenesis of the erythropoietin receptor (EPOR) permits analysis of the contribution that individual amino acid residues make to erythropoietin (EPO) binding.">
+							<entity charOffset="19-32" id="AIMed.d198.s1687.e0" seqId="e5485" text="erythropoietin" type="protein" />
+							<entity charOffset="19-41" id="AIMed.d198.s1687.e1" seqId="e5487" text="erythropoietin receptor" type="protein" />
+				'''
+				''' debugging
+				if pair_e1 == pair_e2:
+					print('pair_id:', pair_id)
+					print('pair_e1 == pair_e2:', pair_e1, pair_e2)
+					input('enter..')
+					
+				if e1_start_idx == e2_start_idx:
+					print('pair_id:', pair_id)
+					print('e1_start_idx == e2_start_idx:', e1_start_idx, e2_start_idx)
+					input('enter..')
+				
+				if e1_start_idx > e2_start_idx and e1_start_idx < e2_end_idx:
+					print('pair_id:', pair_id)
+					print('e1_start_idx > e2_start_idx and e1_start_idx < e2_end_idx:', e1_start_idx, e2_start_idx, e2_end_idx)
+					input('enter..')
+				
+				if e2_start_idx > e1_start_idx and e2_start_idx < e1_end_idx:
+					print('pair_id:', pair_id)
+					print('e2_start_idx > e1_start_idx and e2_start_idx < e1_end_idx:', e2_start_idx, e1_start_idx, e1_end_idx)
+					input('enter..')
+				'''
+				if pair_e1 == pair_e2 \
+				   or e1_start_idx == e2_start_idx \
+				   or (e1_start_idx > e2_start_idx and e1_start_idx < e2_end_idx) \
+				   or (e2_start_idx > e1_start_idx and e2_start_idx < e1_end_idx):
+					continue
+				
+				tagged_sent = sent_txt
+
 				if e1_start_idx < e2_start_idx: # replace first the one located in the rear.
 					tagged_sent = tagged_sent[:e2_start_idx] + '<e2>' + e2_text + '</e2>' + tagged_sent[e2_end_idx:]
 					tagged_sent = tagged_sent[:e1_start_idx] + '<e1>' + e1_text + '</e1>' + tagged_sent[e1_end_idx:]
@@ -635,7 +733,13 @@ def get_samples_from_ppi_benchmark(file, num_of_sample=None, predefined_relation
 					tagged_sent = tagged_sent[:e1_start_idx] + '<e1>' + e1_text + '</e1>' + tagged_sent[e1_end_idx:]
 					tagged_sent = tagged_sent[:e2_start_idx] + '<e2>' + e2_text + '</e2>' + tagged_sent[e2_end_idx:]
 				
-				relation_type = 'pos' if pair_interaction == 'True' else 'neg'
+				if tagged_sent in unique_sents: # all sentences with tags must be unique. this is for just in case.
+					print('duplicate sent:', tagged_sent)
+					continue
+				else:
+					unique_sents.add(tagged_sent)
+
+				relation_type = 'positive' if pair_interaction == 'True' else 'negative'
 
 				sample = []
 				sample.append(pair_id + '\t"' + tagged_sent + '"') # use pair_id for unique id.
@@ -643,44 +747,153 @@ def get_samples_from_ppi_benchmark(file, num_of_sample=None, predefined_relation
 					sample.append(predefined_relation_type + '(e1,e2)')
 				else:
 					sample.append(relation_type + '(e1,e2)')
-				sample.append('Comment: ')
+				#sample.append('Comment: ')
+				sample.append('Comment: ' + sent_id) # added sentence ids to be used to group the same sentences for different pairs in joint ner ppi learning. 05-01-2021
 				sample.append('\n')
-				
+
 				if doc_id in samples:
 					samples[doc_id].append(sample)
 				else:
 					samples[doc_id] = [sample]
 
 	return samples
-# [GP][END] - pre-processed PPI benchmark datasets (AImed, BioInfer, HPRD50, IEPA, LLL). 02-19-2021
+# [GP][END] - PPI benchmark datasets pre-processing. 02-19-2021
+
+
+# [GP][START] - PPI benchmark typed datasets pre-processing. 03-18-2021
+def get_samples_from_ppi_benchmark_type(file, num_of_sample=None, predefined_relation_type=None):
+	"""
+	Data preprocessing for PPI benchmark datasets typed (annotated by BNL).
+	
+	This data contains types of relations such as 'enzyme', 'structural'.
+	"""
+	
+	# First, read samples from the original file, and then replace positive relation_type with new types (e.g., enzyme, structural) 
+	# e.g., orig_file = PPI/original/AImed/AImed.xml
+	#		type_file = PPI/type_annotation/AImed_type/aimed_type_annotations_srm.tsv
+	original_file_dir = file.rsplit('/', 1)[0].rsplit('_', 1)[0] + '/'
+	original_file_dir = original_file_dir.replace('type_annotation', 'original')
+	
+	original_file = None
+	for f in os.listdir(original_file_dir):
+		if f.endswith(".xml"):
+			original_file = os.path.join(original_file_dir, f)
+			break
+	
+	if original_file == None:
+		logger.error("original file does not exist!!")
+		sys.exit()
+
+	samples = get_samples_from_ppi_benchmark(original_file)
+
+	def update_rel_type(samples, pair_id, relation_type):
+		for doc_id, sample_list in samples.items():
+			for idx, sample in enumerate(sample_list):
+				sample_pair_id = sample[0].split('\t', 1)[0]
+				if pair_id == sample_pair_id:
+					samples[doc_id][idx][1] = relation_type + '(e1,e2)'
+					return
+		return
+	
+	# [START] used for negative_annotation_files e.g., passed_full_aimed_training.tsv 05-04-2021
+	neg_sample_processing = False
+	
+	if neg_sample_processing is True:
+		negative_pair_ids = []
+	# [END] used for negative_annotation_files e.g., passed_full_aimed_training.tsv 05-04-2021
+	
+	with open(file) as fp:
+		reader = csv.reader(fp, delimiter="\t")
+		for row in reader:
+			if not row:
+				continue # skip empty lines
+
+			if not row[0].startswith('sentence'):
+				pair_id = row[0].strip()
+				relation_type = row[1].strip()
+				
+				if relation_type in ['enzyme', 'structural']:
+					update_rel_type(samples, pair_id, relation_type)
+				
+				# [START] used for negative_annotation_files e.g., passed_full_aimed_training.tsv 05-04-2021
+				if neg_sample_processing is True:
+					if relation_type == 'negative':
+						negative_pair_ids.append(pair_id)	
+				# [END] used for negative_annotation_files e.g., passed_full_aimed_training.tsv 05-04-2021
+				
+				# debugging
+				if relation_type not in ['enzyme', 'structural', 'negative', '?']:
+					print('unknown relation type:', relation_type)
+					input('enter...')
+	
+	# [START] used for negative_annotation_files e.g., passed_full_aimed_training.tsv 05-04-2021
+	if neg_sample_processing is True:
+		negative_samples = {}
+		for doc_id, sample_list in samples.items():
+			for idx, sample in enumerate(sample_list):
+				sample_pair_id = sample[0].split('\t', 1)[0]
+				if sample_pair_id in negative_pair_ids:
+					if doc_id in negative_samples:
+						negative_samples[doc_id].append(sample)
+					else:
+						negative_samples[doc_id] = [sample]
+		
+		samples = negative_samples
+	# [END] used for negative_annotation_files e.g., passed_full_aimed_training.tsv 05-04-2021
+	
+	# remove samples tagged with 'positive' since the classes are 'enzyme', 'structural', 'negative'.
+	for doc_id, sample_list in samples.items():
+		# [START] used for negative_annotation_files e.g., passed_full_aimed_training.tsv 05-04-2021
+		if neg_sample_processing is True:
+			samples[doc_id] = [x for x in sample_list if not x[1].startswith('positive')]
+		# [END] used for negative_annotation_files e.g., passed_full_aimed_training.tsv 05-04-2021
+		else:
+			# [START] use this option to remove 'negative' samples from original data. 05-04-2021
+			samples[doc_id] = [x for x in sample_list if not x[1].startswith('positive') and not x[1].startswith('negative')]
+			# [END] use this option to remove 'negative' samples from original data. 05-04-2021
+			
+	return samples
+# [GP][END] - PPI benchmark typed datasets pre-processing. 03-18-2021
 
 
 # [GP][START] - PPI datasets pre-processing.
-def store_data(dir, train, dev, test, idx=0):
+def store_data(dir, train, dev, test, classes, idx=0):
 	# flatten list
 	train_text = [item for sublist in train for subsublist in sublist for item in subsublist] 
-	dev_text = [item for sublist in dev for subsublist in sublist for item in subsublist] 
 	test_text = [item for sublist in test for subsublist in sublist for item in subsublist]
-	
-	sents, relations, comments, blanks = process_text(train_text, 'train')
-	df_train = pd.DataFrame(data={'sents': sents, 'relations': relations})
-
-	sents, relations, comments, blanks = process_text(dev_text, 'dev')
-	df_dev = pd.DataFrame(data={'sents': sents, 'relations': relations})
-
+	if dev is not None:
+		dev_text = [item for sublist in dev for subsublist in sublist for item in subsublist] 
+		
+	sents, relations, comments, blanks = process_text(train_text, 'train') # comments are used to store sentence ids. 05-01-2021
+	df_train = pd.DataFrame(data={'sents': sents, 'relations': relations, 'sent_ids': comments}) # added sentence ids to be used to group the same sentences for different pairs in joint ner ppi learning. 05-01-2021
 	sents, relations, comments, blanks = process_text(test_text, 'test')
-	df_test = pd.DataFrame(data={'sents': sents, 'relations': relations})
-
-	rm = Relations_Mapper(pd.concat([df_train['relations'], df_dev['relations'], df_test['relations']], axis=0))
+	df_test = pd.DataFrame(data={'sents': sents, 'relations': relations, 'sent_ids': comments}) # added sentence ids to be used to group the same sentences for different pairs in joint ner ppi learning. 05-01-2021
+	if dev is not None:
+		sents, relations, comments, blanks = process_text(dev_text, 'dev')
+		df_dev = pd.DataFrame(data={'sents': sents, 'relations': relations, 'sent_ids': comments}) # added sentence ids to be used to group the same sentences for different pairs in joint ner ppi learning. 05-01-2021
+	
+	# [GP][START] - use input parameter 'classes' instead of classes from the dataset because not every dataset contains all classes 
+	#				in which case Relation_Mapper assigns overlapped relation ids. 04-02-2021
+	#				E.g., BioCreative doesn't have a negative class -> {'enzyme': 0, 'structural': 1}
+	#                     AImed, BioInfer -> {'enzyme': 0, 'structural': 1, 'negative': 2}
+	#					  LLL doesn't have a structural class -> {'enzyme': 0, 'negative': 1} 
+	#					  --> 'negative' id conflicts with the 'structural' id in BioCreative when the datasets are combined.
+	#					  
+	#rm = Relations_Mapper(pd.concat([df_train['relations'], df_dev['relations'], df_test['relations']], axis=0))
+	rm = Relations_Mapper([x + '(e1,e2)' for x in classes])
+	# [GP][END] - added a parameter to get a list of classes. 04-02-2021
 	pickle.dump(rm, open(os.path.join(dir, 'relations_' + str(idx) + '.pkl'), "wb"))
 	
 	df_test['relations_id'] = df_test.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
-	df_dev['relations_id'] = df_dev.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
 	df_train['relations_id'] = df_train.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
 	pickle.dump(df_train, open(os.path.join(dir, 'df_train_' + str(idx) + '.pkl'), "wb"))
-	pickle.dump(df_dev, open(os.path.join(dir, 'df_dev_' + str(idx) + '.pkl'), "wb"))
 	pickle.dump(df_test, open(os.path.join(dir, 'df_test_' + str(idx) + '.pkl'), "wb"))
-	
+	if dev is not None:
+		df_dev['relations_id'] = df_dev.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
+		pickle.dump(df_dev, open(os.path.join(dir, 'df_dev_' + str(idx) + '.pkl'), "wb"))
+	else:
+		df_dev = None
+
 	return df_train, df_dev, df_test, rm
 	
 
@@ -689,7 +902,7 @@ def preprocess_ppi(args):
 	Data preprocessing for PPI datasets.
 	
 	History:
-		- pre-processed PPI annotations by BNL (Sean and Ian) from BioCreative datasets. 11-26-2020
+		- pre-processed BioCreative and BioCreative type datasets. 11-26-2020
 		- pre-processed five PPI benchmark datasets: AImed, BioInfer, HPRD50, IEPA, LLL. 02-19-2021
 	"""
 
@@ -699,13 +912,29 @@ def preprocess_ppi(args):
 		# predefined_cls (if not set, it is None) is set when predefined lable is used instead of relation types from datasets. 01-06-2021
 		if args.task == 'BioCreative':
 			doc_samples = get_samples_from_biocreative(args.train_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
-		elif args.task == 'BioCreative_BNL':
-			doc_samples = get_samples_from_bnl_annotation(args.train_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
-		else:
+		elif args.task == 'BioCreative_type':
+			doc_samples = get_samples_from_biocreative_type(args.train_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
+		elif args.task == 'PPIbenchmark':
 			doc_samples = get_samples_from_ppi_benchmark(args.train_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
+		elif args.task == 'PPIbenchmark_type':
+			doc_samples = get_samples_from_ppi_benchmark_type(args.train_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
+		else:
+			sys.exit('Unknown task!!')
 
-		print('num of docs:', len(doc_samples))
+		doc_samples = {k: v for k, v in doc_samples.items() if len(v) > 0} # remove documents having no samples.
 		
+		# debugging
+		'''
+		unique_samples = []
+		for doc, samples in doc_samples.items():
+			for s in samples:
+				if s in unique_samples:
+					print(s)
+					input('enter..')
+				else:
+					unique_samples.append(s)
+		'''
+
 		keys = list(doc_samples.keys())
 		random.shuffle(keys)
 		
@@ -736,6 +965,24 @@ def preprocess_ppi(args):
 		print('num of total samples:', total_num)
 
 		# debugging
+		'''
+		print('len(unique_samples):', len(unique_samples))
+		print('len(samples):', len(samples))
+		
+		samples_unique_samples = []
+		for s in samples:
+			for ss in s:
+				if ss in samples_unique_samples:
+					print(ss)
+					input('enter..')
+				else:
+					samples_unique_samples.append(ss)
+		print('len(samples_unique_samples):', len(samples_unique_samples))			
+
+		all_test_samples = [] 
+		'''
+
+		# debugging
 		if num_of_samples_for_eval != None and num_of_samples_for_eval != len([item for sublist in samples for item in sublist]):
 			input('sampling number is wrong!!')
 		
@@ -743,72 +990,97 @@ def preprocess_ppi(args):
 			dir = args.train_data.rsplit('/', 1)[0] + '/all'
 		else:
 			dir = args.train_data.rsplit('/', 1)[0] + '/' + str(args.num_samples)
+		
+		if not os.path.exists(dir):
+			os.makedirs(dir)
 
 		samples = np.array(samples)
 		kfold = KFold(n_splits=args.num_of_folds, shuffle=False)
 		for idx, (train_index, test_index) in enumerate(kfold.split(samples)):
 			
-			## Train/Validation(Dev)/Test split - 80/10/10, 70/15/15, 60/20/20 ratio
-			if args.ratio == '80-10-10':
+			## Train/Validation(Dev)-optional/Test split - k-folds (train/test split), 80/10/10, 70/15/15, 60/20/20 ratio
+			if args.ratio == 'k-folds':
+				pass
+			elif args.ratio == '80-10-10':
 				dev_index = train_index[:(len(train_index)//9)]
 				train_index = train_index[len(dev_index):]
-			elif args.ratio == '70-15-15':
-				test_index_adjusted = np.append(test_index, train_index[:(len(test_index)//2)])
-				dev_index = train_index[(len(test_index)//2):(len(test_index)//2) + len(test_index_adjusted)]
-				train_index = train_index[(len(test_index)//2) + len(dev_index):]
-				test_index = test_index_adjusted
-			elif args.ratio == '60-20-20':
-				test_index_adjusted = np.append(test_index, train_index[:len(test_index)])
-				dev_index = train_index[len(test_index):len(test_index) + len(test_index_adjusted)]
-				train_index = train_index[len(test_index) + len(dev_index):]
-				test_index = test_index_adjusted
+			
+				#TODO: fix this! - there are duplicates among test sets that must not have duplicates. 04-21-2021
+				''' 
+				elif args.ratio == '70-15-15':
+					test_index_adjusted = np.append(test_index, train_index[:(len(test_index)//2)])
+					dev_index = train_index[(len(test_index)//2):(len(test_index)//2) + len(test_index_adjusted)]
+					train_index = train_index[(len(test_index)//2) + len(dev_index):]
+					test_index = test_index_adjusted
+				elif args.ratio == '60-20-20':
+					test_index_adjusted = np.append(test_index, train_index[:len(test_index)])
+					dev_index = train_index[len(test_index):len(test_index) + len(test_index_adjusted)]
+					train_index = train_index[len(test_index) + len(dev_index):]
+					test_index = test_index_adjusted
+				'''
+			else:
+				logger.error("Unknown ratio!!")
+				sys.exit()
 				
-			#print("TRAIN len:", len(train_index), "DEV len:", len(dev_index), "TEST len:", len(test_index))
-			#print("TRAIN:", train_index, "DEV:", dev_index, "TEST:", test_index)
+			if args.ratio == 'k-folds':
+				train, test = samples[train_index], samples[test_index]
+				dev = None
+				#print("TRAIN len:", len(train_index), "TEST len:", len(test_index))
+				#print("TRAIN:", train_index, "TEST:", test_index)
+			else:
+				train, dev, test = samples[train_index], samples[dev_index], samples[test_index]
+				#print("TRAIN len:", len(train_index), "DEV len:", len(dev_index), "TEST len:", len(test_index))
+				#print("TRAIN:", train_index, "DEV:", dev_index, "TEST:", test_index)
+			
+			# debug
+			'''
+			#test_samples = set()
+			for x in test:
+				for y in x:
+					if y[0] in all_test_samples:
+						print('duplicate:', y[0])
+						input('enter..')
+						
+					else:
+						test_samples.append(y[0])
+						
+			train_samples = set()
+			for x in train:
+				for y in x:
+					train_samples.add(y[0])
 
-			train, dev, test = samples[train_index], samples[dev_index], samples[test_index]
-			df_train, df_dev, df_test, rm = store_data(dir, train, dev, test, idx)
+			#dev_samples = set()
+			#for x in dev:
+			#	for y in x:
+			#		dev_samples.add(y[0])
 
+			#for i in train_samples.intersection(dev_samples):
+			#	print('train_dev overlap:', i)
+			
+			#for i in train_samples.intersection(test_samples):
+			#	print('train_test overlap:', i)
+			
+			#for i in dev_samples.intersection(test_samples):
+			#	print('dev_test overlap:', i)
+			
+			print('len(train_samples):', len(train_samples))
+			#print('len(dev_samples):', len(dev_samples))
+			print('len(test_samples):', len(test_samples))
+			
+			#input('enter.....')
+			'''
+
+			df_train, df_dev, df_test, rm = store_data(dir, train, dev, test, args.classes, idx)	
+			
 			if idx == 0:
 				first_df_train = df_train
 				first_df_dev = df_dev
 				first_df_test = df_test
 				first_rm = rm
-
-			## Train/Test split
-			# -> to use this code, 'samples' must be a list.
-			'''
-			print("TRAIN len:", len(train_index), "TEST len:", len(test_index))
-			print("TRAIN:", train_index, "TEST:", test_index)
 			
-			train, test = samples[train_index], samples[test_index]
-
-			train_text = [item for sublist in train for item in sublist] # flatten list
-			test_text = [item for sublist in test for item in sublist] # flatten list
-			
-			sents, relations, comments, blanks = process_text(train_text, 'train')
-			df_train = pd.DataFrame(data={'sents': sents, 'relations': relations})
-			
-			sents, relations, comments, blanks = process_text(test_text, 'test')
-			df_test = pd.DataFrame(data={'sents': sents, 'relations': relations})
-
-			rm = Relations_Mapper(pd.concat([df_train['relations'], df_test['relations']], axis=0))
-			pickle.dump(rm, open(os.path.join(data_dir, 'relations_' + str(idx) + '.pkl'), "wb"))
-			
-			df_test['relations_id'] = df_test.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
-			df_train['relations_id'] = df_train.progress_apply(lambda x: rm.rel2idx[x['relations']], axis=1)
-			pickle.dump(df_train, open(os.path.join(data_dir, 'df_train_' + str(idx) + '.pkl'), "wb"))
-			pickle.dump(df_test, open(os.path.join(data_dir, 'df_test_' + str(idx) + '.pkl'), "wb"))
-			
-			if idx == 0:
-				first_df_train = df_train
-				first_df_test = df_test
-				first_rm = rm
-			'''
-
 		logger.info("Finished and saved!")
 		
-		#input('enter..')
+		input('enter..')
 		
 		return first_df_train, first_df_dev, first_df_test, first_rm # return the first CV set.
 
@@ -817,15 +1089,21 @@ def preprocess_ppi(args):
 			train_samples = get_samples_from_biocreative(args.train_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
 			if args.train_data != args.test_data:
 				test_samples = get_samples_from_biocreative(args.test_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
-		elif args.task == 'BioCreative_BNL':
-			train_samples = get_samples_from_bnl_annotation(args.train_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
+		elif args.task == 'BioCreative_type':
+			train_samples = get_samples_from_biocreative_type(args.train_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
 			if args.train_data != args.test_data:
-				test_samples = get_samples_from_bnl_annotation(args.test_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
-		else:
+				test_samples = get_samples_from_biocreative_type(args.test_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
+		elif args.task == 'PPIbenchmark':
 			train_samples = get_samples_from_ppi_benchmark(args.train_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
 			if args.train_data != args.test_data:
 				test_samples = get_samples_from_ppi_benchmark(args.test_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
-
+		elif args.task == 'PPIbenchmark_type':
+			train_samples = get_samples_from_ppi_benchmark_type(args.train_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
+			if args.train_data != args.test_data:
+				test_samples = get_samples_from_ppi_benchmark_type(args.test_data, num_of_sample=None, predefined_relation_type=args.predefined_cls)
+		else:
+			sys.exit('Unknown task!!')
+			
 		keys = list(train_samples.keys())
 		random.shuffle(keys)
 		train_samples = [train_samples[k] for k in keys]
@@ -849,6 +1127,9 @@ def preprocess_ppi(args):
 			
 		# TODO: take into account the number of samples like the CV above.
 		dir = args.train_data.rsplit('/', 1)[0] + '/all'
+		
+		if not os.path.exists(dir):
+			os.makedirs(dir)
 			
 		df_train, df_dev, df_test, rm = store_data(dir, train, dev, test, 0)
 		
@@ -935,6 +1216,17 @@ class semeval_dataset(Dataset):
 													   e1_id=self.e1_id, e2_id=self.e2_id), axis=1)
 		print("\nInvalid rows/total: %d/%d" % (df['e1_e2_start'].isnull().sum(), len(df)))
 		self.df.dropna(axis=0, inplace=True)
+		
+		
+		# [GP]
+		'''
+		print(self.df['input'].iloc[0])
+		print(tokenizer.decode(self.df['input'].iloc[0]))
+		print(tokenizer.convert_ids_to_tokens(self.df['input'].iloc[0]))
+		print(self.df['e1_e2_start'].iloc[0])
+		input('enter..')
+		'''
+		
 	
 	def __len__(self,):
 		return len(self.df)
@@ -1075,38 +1367,38 @@ def load_dataloaders(args, dataset_num):
 				df_train, df_test, rm = preprocess_semeval2010_8(args)
 		else:
 			# [GP][START] - PPI datasets pre-processing.
-			#			  - pre-processed BioCreative_BNL data. 11-26-2020
+			#			  - pre-processed BioCreative, BioCreative_type data. 11-26-2020
 			# 			  - added dev set. 12-23-2020
-			#			  - pre-processed AImed, BioInfer, HPRD50, IEPA, LLL. 02-19-2021
-			if args.num_samples == -1:
-				data_dir = args.train_data.rsplit('/', 1)[0] + '/all'
-			else:
-				data_dir = args.train_data.rsplit('/', 1)[0] + '/' + str(args.num_samples)
-	
-			if not os.path.exists(data_dir):
-				os.makedirs(data_dir)
-			
-			relations_path = os.path.join(data_dir, 'relations_' + str(dataset_num) + '.pkl')
-			train_path = os.path.join(data_dir, 'df_train_' + str(dataset_num) + '.pkl')
-			dev_path = os.path.join(data_dir, 'df_dev_' + str(dataset_num) + '.pkl')
-			test_path = os.path.join(data_dir, 'df_test_' + str(dataset_num) + '.pkl')
-
-			if os.path.isfile(relations_path) and os.path.isfile(train_path) and os.path.isfile(dev_path) and os.path.isfile(test_path):
-				rm = pickle.load(open(relations_path, "rb"))
-				df_train = pickle.load(open(train_path, "rb"))
-				df_dev = pickle.load(open(dev_path, "rb"))
-				df_test = pickle.load(open(test_path, "rb"))
-				logger.info("Loaded preproccessed data.")
-			else:
+			#			  - pre-processed PPIbenchmark, PPIbenchmark_type incl. AImed, BioInfer, HPRD50, IEPA, LLL. 02-19-2021
+			if os.path.isfile(args.train_data) and args.train_data.endswith('.pkl') == False: # preprocess original txt, json, tsv files.
 				df_train, df_dev, df_test, rm = preprocess_ppi(args)
+			else:
+				relations_path = os.path.join(args.train_data, 'relations_' + str(dataset_num) + '.pkl')
+				train_path = os.path.join(args.train_data, 'df_train_' + str(dataset_num) + '.pkl')
+				test_path = os.path.join(args.train_data, 'df_test_' + str(dataset_num) + '.pkl')
+				dev_path = os.path.join(args.train_data, 'df_dev_' + str(dataset_num) + '.pkl')
+
+				if os.path.isfile(relations_path) and os.path.isfile(train_path) and os.path.isfile(test_path):
+					rm = pickle.load(open(relations_path, "rb"))
+					df_train = pickle.load(open(train_path, "rb"))
+					df_test = pickle.load(open(test_path, "rb"))
+					df_dev = pickle.load(open(dev_path, "rb")) if os.path.isfile(dev_path) else None # optional
+
+					logger.info("Loaded preproccessed data.")
+				else:
+					logger.error("Data files do not exist!!")
+					sys.exit()
 			# [GP][END] - PPI datasets pre-processing.
 
 		train_set = semeval_dataset(df_train, tokenizer=tokenizer, e1_id=e1_id, e2_id=e2_id)
 		test_set = semeval_dataset(df_test, tokenizer=tokenizer, e1_id=e1_id, e2_id=e2_id)
 		train_length = len(train_set); test_length = len(test_set)
 		# [GP][START] - added dev set. 12-23-2020
-		dev_set = semeval_dataset(df_dev, tokenizer=tokenizer, e1_id=e1_id, e2_id=e2_id)
-		dev_length = len(dev_set)
+		if df_dev is not None:
+			dev_set = semeval_dataset(df_dev, tokenizer=tokenizer, e1_id=e1_id, e2_id=e2_id)
+			dev_length = len(dev_set)
+		else:
+			dev_length = 0
 		# [GP][END] - added dev set. 12-23-2020
 		PS = Pad_Sequence(seq_pad_value=tokenizer.pad_token_id,\
 						  label_pad_value=tokenizer.pad_token_id,\
@@ -1116,8 +1408,11 @@ def load_dataloaders(args, dataset_num):
 		test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True, \
 								  num_workers=0, collate_fn=PS, pin_memory=False)
 		# [GP][START] - added dev set. 12-23-2020
-		dev_loader = DataLoader(dev_set, batch_size=args.batch_size, shuffle=True, \
-								num_workers=0, collate_fn=PS, pin_memory=False)
+		if df_dev is not None:
+			dev_loader = DataLoader(dev_set, batch_size=args.batch_size, shuffle=True, \
+									num_workers=0, collate_fn=PS, pin_memory=False)
+		else:
+			dev_loader = None
 		# [GP][END] - added dev set. 12-23-2020
 	
 	# [GP][START] - added dev set. 12-23-2020	
