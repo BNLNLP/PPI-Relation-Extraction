@@ -7,6 +7,39 @@ import numpy as np
 import pickle
 
 
+
+output_dir = '/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/ALL/all_incl_negative_annotation_ver_19/'
+
+for x in range(10):
+	train = pd.read_pickle(output_dir + 'df_train_' + str(x) + '.pkl')
+	test = pd.read_pickle(output_dir + 'df_test_' + str(x) + '.pkl')
+	
+	train_rel_id = {}
+	for idx, row in train.iterrows():
+		rel_id = row['relations_id']
+		if rel_id in train_rel_id:
+			train_rel_id[rel_id] += 1
+		else:
+			train_rel_id[rel_id] = 1
+		
+	test_rel_id = {}
+	for idx, row in test.iterrows():
+		rel_id = row['relations_id']
+		if rel_id in test_rel_id:
+			test_rel_id[rel_id] += 1
+		else:
+			test_rel_id[rel_id] = 1
+			
+	for k, v in train_rel_id.items():
+		print(k, v)
+		
+	for k, v in test_rel_id.items():
+		print(k, v)	
+
+
+sys.exit()
+
+
 output_dir = '/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/ALL/all_incl_negative_annotation_ver_21/'
 if not os.path.exists(output_dir):
 	os.makedirs(output_dir)
