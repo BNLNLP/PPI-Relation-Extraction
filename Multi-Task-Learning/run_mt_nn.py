@@ -30,6 +30,7 @@ from transformers import (
 	AutoModelForTokenClassification,
 	AutoTokenizer,
 	BertTokenizerFast,
+	RobertaTokenizerFast,
 	DataCollatorForTokenClassification,
 	HfArgumentParser,
 	PreTrainedModel,
@@ -84,7 +85,7 @@ class MultitaskModel(PreTrainedModel):
 		
 
 	@classmethod
-	def create(cls, model_name, model_args, model_type_dict, model_config_dict, data_args, tokenizer_dict):
+	def create(cls, model_name, model_args, model_type_dict, model_config_dict, data_args, tokenizer_dict, task_weights_dict):
 		"""
 		This creates a MultitaskModel using the model class and config objects
 		from single-task models. 
@@ -107,6 +108,7 @@ class MultitaskModel(PreTrainedModel):
 				relation_representation=data_args.relation_representation,
 				num_ppi_labels=len(data_args.ppi_classes),
 				tokenizer=tokenizer_dict[task_name],
+				task_weights=task_weights_dict
 
 			)
 			if shared_encoder is None:
@@ -129,6 +131,10 @@ class MultitaskModel(PreTrainedModel):
 			return "roberta"
 		elif model_class_name.startswith("Albert"):
 			return "albert"
+		elif model_class_name.startswith("Deberta"):
+			return "deberta"
+		elif model_class_name.startswith("Xlnet"):
+			return "xlnet"
 		else:
 			raise KeyError(f"Add support for new model {model_class_name}")
 
@@ -514,7 +520,7 @@ class DataTrainingArguments:
 	relation_representation: str = field(
 		default='EM_entity_start',
 		metadata={"help": "vairous relation representations from [2019] Matching the Blanks: Distributional Similarity for Relation Learning. \
-						   Largely, architectures are divided into standard and entity markers. \
+						   Largely, the representations are divided into standard and entity markers. \
 						   Options: \
 						   1) standard: STANDARD_cls_token, STANDARD_mention_pooling, STANDARD_mention_pooling_plus_context\
 						   2) entity markers (EM): EM_cls_token, EM_mention_pooling, EM_entity_start, EM_entity_start_plus_context \
@@ -920,9 +926,25 @@ def main():
 	
 	do_fine_tune = data_args.do_fine_tune  # only for MTL
 	
+	if len(task_list) == 1:
+		do_fine_tune = False
+	
+	# debug
+	if len(task_list) > 1 and do_fine_tune is False: 
+		sys.exit('ERROR: do_fine_tune must be set as True for MTL!!')
+	
+	# debug
 	if len(task_list) == 1 and do_fine_tune is True:
-		sys.exit('ERROR: do_fine_tune is set for STL!!')
-
+		sys.exit('ERROR: do_fine_tune must be set as False for STL!!')
+	
+	# This is for the loss weighing between tasks test. 09-01-2021
+	if len(task_list) > 1:
+		#task_weights_val = {'ner': 0.5, 'ppi': 0.5}
+		task_weights_val = {'ner': 1, 'ppi': 1}
+	else:
+		task_weights_val = {'ner': 1, 'ppi': 1}
+	
+	
 	for model_name in model_list:
 	
 		model_args.model_name_or_path = model_name
@@ -978,6 +1000,9 @@ def main():
 		print('training_args:', training_args)
 		sys.exit(1)
 		'''
+		
+		do_lower_case = True if "albert" in model_name else model_args.do_lower_case # huggingface all albert models are not case-sensitive.
+
 
 		num_of_datasets = 1 # if not CV, there is only one dataset.
 		if data_args.do_cross_validation:
@@ -988,6 +1013,7 @@ def main():
 		
 		for dataset_num in range(num_of_datasets):
 			logger.info("\n\n*** Dataset number: " + str(dataset_num) + " ***\n\n")
+
 
 
 			'''
@@ -1039,7 +1065,7 @@ def main():
 												use_fast=True,
 												revision=model_args.model_revision,
 												use_auth_token=True if model_args.use_auth_token else None,
-												do_lower_case=model_args.do_lower_case
+												do_lower_case=do_lower_case,
 											)
 				
 				if task_name == 'ner':
@@ -1053,12 +1079,13 @@ def main():
 						)
 					## [end] from NER
 				
+				
 				## commmented this to avoid an error when a model is fine-tuned. 07-12-2021
 				#if task_name == 'ppi' or task_name == 'joint-ner-ppi':
 				# all representations use entity markers except for STANDARD_cls_token. 
 				# STANDARD_mention_pooling needs entity markers to find entities in a sentence.
 				if data_args.relation_representation != 'STANDARD_cls_token':
-					if model_args.do_lower_case:
+					if do_lower_case:
 						tokenizer_dict[task_name].add_tokens(['[e1]', '[/e1]', '[e2]', '[/e2]'])
 					else:
 						tokenizer_dict[task_name].add_tokens(['[E1]', '[/E1]', '[E2]', '[/E2]'])
@@ -1072,11 +1099,22 @@ def main():
 			
 				if isinstance(tokenizer_dict[task_name], BertTokenizerFast):
 					tokenizer_dict[task_name].model_max_length = 512 # BioBERT default max length is too large. 512 is a default value of BERT tokenizer.
-
+				
+				# to avoid the error "AssertionError: You need to instantiate RobertaTokenizerFast with add_prefix_space=True to use it with pretokenized inputs."
+				if isinstance(tokenizer_dict[task_name], RobertaTokenizerFast):
+					tokenizer_dict[task_name].add_prefix_space = True
+				
+				## TODO: temporarily, DeBERTa runs on a different Transformers version (4.10.0). Merge this to the above after the Transformers update in nlp-prj env.
+				# to avoid the error "AssertionError: You need to instantiate DebertaTokenizerFast with add_prefix_space=True to use it with pretokenized inputs."
+				if "deberta" in model_name:
+					from transformers import DebertaTokenizerFast
+					if isinstance(tokenizer_dict[task_name], DebertaTokenizerFast):
+						tokenizer_dict[task_name].add_prefix_space = True
+				
 				# debugging
 				'''
 				print(tokenizer_dict[task_name])
-				print(isinstance(tokenizer_dict[task_name], BertTokenizerFast))
+				#print(isinstance(tokenizer_dict[task_name], BertTokenizerFast))
 				print('tokenizer_dict[task_name].model_max_length:', tokenizer_dict[task_name].model_max_length)
 				print(tokenizer_dict[task_name].tokenize("[E1]BioBERT[/E1] sets [E2]do_lower_case[/E2] to True by default. Test IT."))
 				input('enter..')
@@ -1112,6 +1150,7 @@ def main():
 				model_config_dict=model_config_dict,
 				data_args=data_args,
 				tokenizer_dict=tokenizer_dict,
+				task_weights_dict=task_weights_val,
 			)
 			
 			for task_name in task_list:
@@ -1141,7 +1180,7 @@ def main():
 			padding = "max_length" if data_args.pad_to_max_length else False
 			## [end] from NER
 
-			features_dict = featurize_data(dataset_dict, tokenizer_dict, padding, data_args, model_args.do_lower_case)
+			features_dict = featurize_data(dataset_dict, tokenizer_dict, padding, data_args, do_lower_case)
 
 			train_dataset = {task_name: dataset["train"] for task_name, dataset in features_dict.items()}
 			eval_dataset = {task_name: dataset["validation"] for task_name, dataset in features_dict.items() if "validation" in dataset}
@@ -1337,7 +1376,8 @@ def main():
 						task_model = AutoModelForTokenClassification.from_pretrained(os.path.join(training_args.output_dir, task_name),
 																					 relation_representation=data_args.relation_representation,
 																					 num_ppi_labels=len(data_args.ppi_classes),
-																					 tokenizer=tokenizer_dict[task_name])
+																					 tokenizer=tokenizer_dict[task_name],
+																					 task_weights={'ner': 1, 'ppi': 1},)
 
 						task_train_dataset = train_dataset[task_name]
 						
