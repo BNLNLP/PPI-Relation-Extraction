@@ -6,6 +6,8 @@ import pandas as pd
 import numpy as np
 from datasets import ClassLabel, load_dataset, load_metric, Dataset, DatasetDict, concatenate_datasets
 
+from transformers import BertTokenizerFast, RobertaTokenizerFast
+
 import spacy
 from spacy.symbols import ORTH
 nlp = spacy.load("en_core_web_sm", disable=["tagger", "ner"])
@@ -184,6 +186,8 @@ def tokenize_and_tag(nlp, sample, include_ppi_label=False):
 	return words, ner, ppi_relation
 	
 
+'''
+# deprecated
 def convert_ppi_into_ner_format(df_ppi, include_ppi_label=False):
 	
 	if include_ppi_label == True:
@@ -200,7 +204,7 @@ def convert_ppi_into_ner_format(df_ppi, include_ppi_label=False):
 			df_ner = df_ner.append({'words': words, 'ner': ner}, ignore_index=True)	
 
 	return df_ner
-
+'''
 
 def convert_ppi_into_joint_ner_ppi_format(df_ppi):
 	"""
@@ -757,9 +761,9 @@ def get_e1e2_start(tokenizer, x, e1_start_id, e2_start_id):
 
 def get_entity_mention(tokenizer, x, e1_start_id, e2_start_id, e1_end_id, e2_end_id):
 	try:
-		entity_mention = ([i + 1 for i, e in enumerate(x) if e == e1_start_id][0],\
+		entity_mention = ([i+1 for i, e in enumerate(x) if e == e1_start_id][0],\
 						  [i for i, e in enumerate(x) if e == e1_end_id][0],\
-						  [i + 1 for i, e in enumerate(x) if e == e2_start_id][0],\
+						  [i+1 for i, e in enumerate(x) if e == e2_start_id][0],\
 						  [i for i, e in enumerate(x) if e == e2_end_id][0])
 	except Exception as e:
 		entity_mention = None
@@ -780,6 +784,15 @@ def tokenize_and_find_em(examples, tokenizer, relation_representation, e1_start_
 	)
 	
 	# debug
+	'''
+	print(tokenizer)
+	print(isinstance(tokenizer, BertTokenizerFast))
+	for k, v in tokenized_inputs.items():
+		print(k, v)
+		
+	input('enter..')
+	'''
+	
 	''' 
 	print(tokenizer.additional_special_tokens)	
 	for i in tokenized_inputs['input_ids']:
@@ -795,7 +808,7 @@ def tokenize_and_find_em(examples, tokenizer, relation_representation, e1_start_
 								   'EM_mention_pooling', 'EM_entity_start_plus_context']:
 		tokenized_inputs['entity_mention'] = list(map(lambda x: get_entity_mention(tokenizer, x, e1_start_id=e1_start_id, e2_start_id=e2_start_id, e1_end_id=e1_end_id, e2_end_id=e2_end_id), tokenized_inputs['input_ids']))
 
-		if relation_representation == 'STANDARD_mention_pooling': # remove entity markers and adjust entity indices.
+		if relation_representation in ['STANDARD_mention_pooling', 'STANDARD_mention_pooling_plus_context']: # remove entity markers and adjust entity indices.
 			entity_mention = tokenized_inputs['entity_mention']
 			entity_mention = [list(x) for x in entity_mention]
 			
@@ -809,7 +822,8 @@ def tokenize_and_find_em(examples, tokenizer, relation_representation, e1_start_
 				# remove entity markers from the high index number to preserve the other indices. [E1] is start idx - 1.
 				for e_idx in sorted([e1_start_idx - 1, e1_end_idx, e2_start_idx - 1, e2_end_idx], reverse=True):
 					tokenized_inputs['input_ids'][idx].pop(e_idx)
-					tokenized_inputs['token_type_ids'][idx].pop(e_idx)
+					if isinstance(tokenizer, RobertaTokenizerFast) == False:
+						tokenized_inputs['token_type_ids'][idx].pop(e_idx)
 					tokenized_inputs['attention_mask'][idx].pop(e_idx)
 					
 				# if entity 1 appears before entity 2 in the sentence,
@@ -912,8 +926,9 @@ def tokenize_and_align_labels_and_find_em(examples, tokenizer, text_column_name,
 				print(examples['words'][i])
 				print('e1_s is greater than e2_s:', e1_s, e1_e, e2_s, e2_e)
 				input('enter..')
+
 			
-			
+			# TODO: find a better way than manual coding.
 			'''
 			enzyme 0
 			structural 1
@@ -954,12 +969,13 @@ def tokenize_and_align_labels_and_find_em(examples, tokenizer, text_column_name,
 		ppi_relations.append(ppi_entity_span)
 		
 	tokenized_inputs['labels'] = labels
-	
-	for i in ppi_relations:
-		i += [-1] * (1100 - len(i))
+
+	#for i in ppi_relations:
+	#	i += [-100] * (1100 - len(i)) # padding
 
 	tokenized_inputs['ppi_relations'] = ppi_relations
 	#print('max_ppi_span_len:', max_ppi_span_len)
+
 
 	
 	
@@ -1103,6 +1119,8 @@ def featurize_data(dataset_dict, tokenizer_dict, padding, data_args, do_lower_ca
 		features_dict[task_name] = {}
 		tokenizer = tokenizer_dict[task_name]
 		
+		if isinstance(tokenizer_dict[task_name], RobertaTokenizerFast):
+			columns_dict[task_name].remove('token_type_ids') # RoBERTa doesn't use NSP, so it doesn't need 'token_type_ids' which is segement IDs.
 		
 		# TODO: this is redundant with the code above. clean it!!
 		if task_name == 'ner' or task_name == 'joint-ner-ppi':

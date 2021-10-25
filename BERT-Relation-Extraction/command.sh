@@ -43,19 +43,26 @@ do
 			#export TEST_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/BioInfer_type/bioinfer_type_annotations_srm.tsv
 			
 			# Original datasets
-			#export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/original/AImed/AImed.xml
+			export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/original/AImed/AImed.xml
 			#export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/original/BioInfer/BioInferCLAnalysis_split_SMBM_version.xml
 			#export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/original/HPRD50/HPRD50.xml			
 			#export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/original/IEPA/IEPA.xml
 			#export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/original/LLL/LLL.xml
 			
 			# Positive (enzyme, structural) annotations
-			export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioCreative_type/01_27_2021/IKB_Sean_BioCreative_full_text_annotation.txt
+			#export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioCreative_type/01_27_2021/IKB_Sean_BioCreative_full_text_annotation.txt
 			#export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/AImed_type/aimed_type_annotations_srm.tsv
 			#export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioInfer_type/bioinfer_type_annotations_struct_histones_srm.tsv
 			#export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/HPRD50_type/hprd50_type_annotation_srm.tsv
 			#export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/IEPA_type/iepa_type_annotations_srm.tsv
 			#export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/LLL_type/lll_type_annotations_srm.tsv
+			
+			# Positive (enzyme, structural) annotations - filtered error cases (duplicate labeling for the same pair in a sentence e.g., A-B: enzyme, A-B: negative) 08-31-2021
+			#export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/AImed_type/aimed_type_annotations_srm.filtered.tsv
+			#export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioInfer_type/bioinfer_type_annotations_struct_histones_srm.filtered.tsv
+			#export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/HPRD50_type/hprd50_type_annotation_srm.filtered.tsv
+			#export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/IEPA_type/iepa_type_annotations_srm.filtered.tsv
+			#export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/LLL_type/lll_type_annotations_srm.filtered.tsv
 			
 			# Negative annotations - WARNING!! DO NOT forget to change the code in preprocessing_funcs.py (set neg_sample_processing = True) !!! 
 			#export TRAIN_DATA=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/AImed_type/passed_full_aimed_training_ikb.tsv
@@ -69,7 +76,7 @@ do
 			#export TEST_DATA=~/RadBio/radbio_ppi.txt
 
 			#export RESULT_DIR=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/results/BioCreative/12_22_2020
-			#export RESULT_DIR=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/results/PPI/AImed_BioInfer_HPRD50_IEPA_LLL
+			#export RESULT_DIR=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/results/PPI/LLL
 			export RESULT_DIR=~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/results/PPI/type_annotation
 			
 			#export RESULT_DIR=~/RadBio
@@ -79,9 +86,9 @@ do
 			#srun -p volta -A covid-19-volta -t 24:00:00 -N 1 --gres=gpu:8 -J re \
 			
 			python ~/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/main_task.py \
-				--task=PPIbenchmark_type \
-				--num_classes=3 \
-				--classes enzyme structural negative \
+				--task=PPIbenchmark \
+				--num_classes=2 \
+				--classes positive negative \
 				--train_data=$TRAIN_DATA \
 				--test_data=$TEST_DATA \
 				--use_pretrained_blanks=0 \

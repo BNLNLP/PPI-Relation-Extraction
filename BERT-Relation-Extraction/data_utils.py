@@ -7,40 +7,100 @@ import numpy as np
 import pickle
 
 
+'''
+AIMed_filtered_file = '/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/AImed_type/aimed_type_annotations_srm.filtered.tsv'                                                                                                                         
+Bioinfer_filtered_file = '/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioInfer_type/bioinfer_type_annotations_struct_histones_srm.filtered.tsv'                                                                                                                       
+IEPA_filtered_file = '/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/IEPA_type/iepa_type_annotations_srm.filtered.tsv'
+LLL_filtered_file = '/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/LLL_type/lll_type_annotations_srm.filtered.tsv'
 
-output_dir = '/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/ALL/all_incl_negative_annotation_ver_19/'
+filtered_sent_ids = []
+
+with open(AIMed_filtered_file) as f:
+	for line in f.readlines():
+		if line.startswith('sentence'):
+			id = line.split()[1].strip().lower()
+			filtered_sent_ids.append(id)
+
+with open(Bioinfer_filtered_file) as f:
+	for line in f.readlines():
+		if line.startswith('sentence'):
+			id = line.split()[1].strip().lower()
+			filtered_sent_ids.append(id)
+
+with open(IEPA_filtered_file) as f:
+	for line in f.readlines():
+		if line.startswith('sentence'):
+			id = line.split()[1].strip().lower()
+			filtered_sent_ids.append(id)
+
+with open(LLL_filtered_file) as f:
+	for line in f.readlines():
+		if line.startswith('sentence'):
+			id = line.split()[1].strip().lower()
+			filtered_sent_ids.append(id)
+
+#output_dir = '/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/ALL/old_duplicate_label_error/all_incl_negative_annotation_ver_17/'
+#filtered_output_dir = '/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/ALL/all_incl_negative_annotation_ver_17_filtered/'
+#output_dir = '/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/ALL/all_incl_negative_annotation_ver_20/'
+output_dir 			= '/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/LLL_type/old_duplicate_label_error/ver_11/all_no_negative/'
+#output_dir 			= '/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/AImed_type/ver_30/all_no_negative/'
+filtered_output_dir = '/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/LLL_type/ver_11_filtered/all_no_negative/'
+
+label_dict = {} # debug
 
 for x in range(10):
 	train = pd.read_pickle(output_dir + 'df_train_' + str(x) + '.pkl')
 	test = pd.read_pickle(output_dir + 'df_test_' + str(x) + '.pkl')
 	
-	train_rel_id = {}
+	
+	train_to_be_removed_idx = []
 	for idx, row in train.iterrows():
-		rel_id = row['relations_id']
-		if rel_id in train_rel_id:
-			train_rel_id[rel_id] += 1
-		else:
-			train_rel_id[rel_id] = 1
-		
-	test_rel_id = {}
+		sent_id = row['sent_ids'].strip().lower()
+		#relations_id = row['relations_id']
+		#if relations_id == 0:
+		#	continue
+		if sent_id.startswith('aimed') or sent_id.startswith('bioinfer') or sent_id.startswith('iepa') or sent_id.startswith('lll'):
+			if sent_id not in filtered_sent_ids:
+				train_to_be_removed_idx.append(idx)
+	train.drop(train_to_be_removed_idx, inplace=True)		
+	
+	test_to_be_removed_idx = []
+	for idx, row in test.iterrows():
+		sent_id = row['sent_ids'].strip().lower() 
+		#relations_id = row['relations_id']
+		#if relations_id == 0:
+		#	continue
+		if sent_id.startswith('aimed') or sent_id.startswith('bioinfer') or sent_id.startswith('iepa') or sent_id.startswith('lll'):
+			if sent_id not in filtered_sent_ids:
+				print(sent_id)
+				print(row['sents'])
+				test_to_be_removed_idx.append(idx)
+	test.drop(test_to_be_removed_idx, inplace=True)		
+	
+	pickle.dump(train, open(os.path.join(filtered_output_dir, 'df_train_' + str(x) + '.pkl'), "wb"))
+	pickle.dump(test, open(os.path.join(filtered_output_dir, 'df_test_' + str(x) + '.pkl'), "wb"))
+	
+	
+	
 	for idx, row in test.iterrows():
 		rel_id = row['relations_id']
-		if rel_id in test_rel_id:
-			test_rel_id[rel_id] += 1
-		else:
-			test_rel_id[rel_id] = 1
-			
-	for k, v in train_rel_id.items():
-		print(k, v)
-		
-	for k, v in test_rel_id.items():
-		print(k, v)	
 
+		if rel_id in label_dict:
+			label_dict[rel_id] += 1
+		else:
+			label_dict[rel_id] = 1
+	
+for k, v in label_dict.items():
+	print(k, v)
 
 sys.exit()
+'''
 
+all_ver = '17_filtered'
+biocreative_ver = '9'
+benchmark_ver = '11_filtered'
 
-output_dir = '/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/ALL/all_incl_negative_annotation_ver_21/'
+output_dir = '/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/ALL/all_incl_negative_annotation_ver_' + all_ver
 if not os.path.exists(output_dir):
 	os.makedirs(output_dir)
 
@@ -52,43 +112,43 @@ dup_cnt = 0 # debug
 label_dict = {} # debug
 
 for x in range(num_of_folds):
-	biocreative_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioCreative_type/01_27_2021/ver_13/all/df_train_' + str(x) + '.pkl')
-	biocreative_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioCreative_type/01_27_2021/ver_13/all/df_test_' + str(x) + '.pkl')
+	biocreative_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioCreative_type/01_27_2021/ver_' + biocreative_ver + '/all/df_train_' + str(x) + '.pkl')
+	biocreative_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioCreative_type/01_27_2021/ver_' + biocreative_ver + '/all/df_test_' + str(x) + '.pkl')
 
-	aimed_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/AImed_type/ver_15/all_no_negative/df_train_' + str(x) + '.pkl')
-	aimed_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/AImed_type/ver_15/all_no_negative/df_test_' + str(x) + '.pkl')
+	aimed_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/AImed_type/ver_'+ benchmark_ver + '/all_no_negative/df_train_' + str(x) + '.pkl')
+	aimed_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/AImed_type/ver_'+ benchmark_ver + '/all_no_negative/df_test_' + str(x) + '.pkl')
 	#if use_dev:
 	#	aimed_dev = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/AImed_type/all/df_dev_' + str(x) + '.pkl')
 	
-	aimed_neg_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/AImed_type/ver_15/all_negative/df_train_' + str(x) + '.pkl')
-	aimed_neg_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/AImed_type/ver_15/all_negative/df_test_' + str(x) + '.pkl')
+	aimed_neg_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/AImed_type/ver_'+ benchmark_ver + '/all_negative/df_train_' + str(x) + '.pkl')
+	aimed_neg_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/AImed_type/ver_'+ benchmark_ver + '/all_negative/df_test_' + str(x) + '.pkl')
 	
-	bioinfer_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioInfer_type/ver_15/all_no_negative/df_train_' + str(x) + '.pkl')
-	bioinfer_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioInfer_type/ver_15/all_no_negative/df_test_' + str(x) + '.pkl')
+	bioinfer_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioInfer_type/ver_'+ benchmark_ver + '/all_no_negative/df_train_' + str(x) + '.pkl')
+	bioinfer_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioInfer_type/ver_'+ benchmark_ver + '/all_no_negative/df_test_' + str(x) + '.pkl')
 	#if use_dev:
 	#	bioinfer_dev = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioInfer_type/all/df_dev_' + str(x) + '.pkl')
 	
-	bioinfer_neg_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioInfer_type/ver_15/all_negative/df_train_' + str(x) + '.pkl')
-	bioinfer_neg_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioInfer_type/ver_15/all_negative/df_test_' + str(x) + '.pkl')
+	bioinfer_neg_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioInfer_type/ver_'+ benchmark_ver + '/all_negative/df_train_' + str(x) + '.pkl')
+	bioinfer_neg_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/BioInfer_type/ver_'+ benchmark_ver + '/all_negative/df_test_' + str(x) + '.pkl')
 	
-	hprd50_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/HPRD50_type/ver_15/all_no_negative/df_train_' + str(x) + '.pkl')
-	hprd50_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/HPRD50_type/ver_15/all_no_negative/df_test_' + str(x) + '.pkl')
+	hprd50_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/HPRD50_type/ver_'+ benchmark_ver + '/all_no_negative/df_train_' + str(x) + '.pkl')
+	hprd50_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/HPRD50_type/ver_'+ benchmark_ver + '/all_no_negative/df_test_' + str(x) + '.pkl')
 	#if use_dev:
 	#	hprd50_dev = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/HPRD50_type/all/df_dev_' + str(x) + '.pkl')
 	
-	hprd50_neg_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/HPRD50_type/ver_15/all_negative/df_train_' + str(x) + '.pkl')
-	hprd50_neg_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/HPRD50_type/ver_15/all_negative/df_test_' + str(x) + '.pkl')
+	hprd50_neg_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/HPRD50_type/ver_'+ benchmark_ver + '/all_negative/df_train_' + str(x) + '.pkl')
+	hprd50_neg_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/HPRD50_type/ver_'+ benchmark_ver + '/all_negative/df_test_' + str(x) + '.pkl')
 	
-	iepa_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/IEPA_type/ver_15/all_no_negative/df_train_' + str(x) + '.pkl')
-	iepa_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/IEPA_type/ver_15/all_no_negative/df_test_' + str(x) + '.pkl')
+	iepa_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/IEPA_type/ver_'+ benchmark_ver + '/all_no_negative/df_train_' + str(x) + '.pkl')
+	iepa_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/IEPA_type/ver_'+ benchmark_ver + '/all_no_negative/df_test_' + str(x) + '.pkl')
 	#if use_dev:
 	#	iepa_dev = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/IEPA_type/all/df_dev_' + str(x) + '.pkl')
 	
-	iepa_neg_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/IEPA_type/ver_15/all_negative/df_train_' + str(x) + '.pkl')
-	iepa_neg_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/IEPA_type/ver_15/all_negative/df_test_' + str(x) + '.pkl')
+	iepa_neg_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/IEPA_type/ver_'+ benchmark_ver + '/all_negative/df_train_' + str(x) + '.pkl')
+	iepa_neg_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/IEPA_type/ver_'+ benchmark_ver + '/all_negative/df_test_' + str(x) + '.pkl')
 	
-	lll_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/LLL_type/ver_15/all_no_negative/df_train_' + str(x) + '.pkl')
-	lll_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/LLL_type/ver_15/all_no_negative/df_test_' + str(x) + '.pkl')
+	lll_train = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/LLL_type/ver_'+ benchmark_ver + '/all_no_negative/df_train_' + str(x) + '.pkl')
+	lll_test = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/LLL_type/ver_'+ benchmark_ver + '/all_no_negative/df_test_' + str(x) + '.pkl')
 	#if use_dev:
 	#	lll_dev = pd.read_pickle('/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/BERT-Relation-Extraction/data/PPI/type_annotation/LLL_type/all/df_dev_' + str(x) + '.pkl')
 	

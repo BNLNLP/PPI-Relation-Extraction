@@ -522,7 +522,7 @@ class DataTrainingArguments:
 		metadata={"help": "vairous relation representations from [2019] Matching the Blanks: Distributional Similarity for Relation Learning. \
 						   Largely, the representations are divided into standard and entity markers. \
 						   Options: \
-						   1) standard: STANDARD_cls_token, STANDARD_mention_pooling, STANDARD_mention_pooling_plus_context\
+						   1) standard: STANDARD_cls_token, STANDARD_mention_pooling, STANDARD_mention_pooling_plus_context \
 						   2) entity markers (EM): EM_cls_token, EM_mention_pooling, EM_entity_start, EM_entity_start_plus_context \
 						   - multiple relations: Multiple_Relations \
 						   * for poolings, max pooling is used. "}
@@ -671,7 +671,7 @@ def evaluate_results(net, test_loader, pad_id, cuda):
 ## [end] from PPI	
 
 
-def save_results(results_dict, data_list, task_list, label_list, output_dir, do_cross_validation, save_misclassified_samples):
+def save_results(results_dict, data_list, task_list, learning_type, label_list, output_dir, do_cross_validation, save_misclassified_samples):
 	
 	if do_cross_validation:
 		all_results_per_data_and_task = {}
@@ -687,16 +687,10 @@ def save_results(results_dict, data_list, task_list, label_list, output_dir, do_
 			for task_name in task_list:
 				miscls_samples_per_data_and_task[data_name][task_name] = {}
 	
-	if len(task_list) > 1:
-		learning_type = 'mtl' # multi-task learning
-	else:
-		learning_type = 'stl' # single task learning
-	
 	if not os.path.exists(output_dir):
 		os.makedirs(output_dir)
 				
 	#mis_sents = [] # debug
-	
 	
 	for dataset_num, results in results_dict.items():
 		for result in results:
@@ -706,29 +700,33 @@ def save_results(results_dict, data_list, task_list, label_list, output_dir, do_
 			tokenizer_dict = result['tokenizer_dict']
 	
 			for task_name, pred_output in preds_dict.items():
-				if task_name == 'ner':
+				if task_name == 'ner' or task_name == 'ppi-multiple':
 								
 					## [start] from NER
 					# Metrics
 					metric = load_metric("seqeval")
 					
-					ner_label_list = label_list['ner']
+					#ner_label_list = label_list['ner']
+					task_label_list = label_list[task_name]
 					
 					def compute_metrics(p):
 						predictions, labels = p
 						predictions = np.argmax(predictions, axis=2)
 						
 
-						# ner_label_list: ['B-PROT', 'B-SPECIES', 'I-PROT', 'I-SPECIES', 'O']
+						# ner labels: ['B-PROT', 'B-SPECIES', 'I-PROT', 'I-SPECIES', 'O']
+						# ner labels: ['B-PROT', 'I-PROT', 'O']
+						# ppi labels: ['positive', 'negative']
+						# ppi labels: ['enzyme', 'structural', 'negative']
 
 
 						# Remove ignored index (special tokens)
 						true_predictions = [
-							[ner_label_list[p] for (p, l) in zip(prediction, label) if l != -100]
+							[task_label_list[p] for (p, l) in zip(prediction, label) if l != -100]
 							for prediction, label in zip(predictions, labels)
 						]
 						true_labels = [
-							[ner_label_list[l] for (p, l) in zip(prediction, label) if l != -100]
+							[task_label_list[l] for (p, l) in zip(prediction, label) if l != -100]
 							for prediction, label in zip(predictions, labels)
 						]
 
@@ -754,8 +752,24 @@ def save_results(results_dict, data_list, task_list, label_list, output_dir, do_
 						}
 					## [end] from NER
 
-
-					result = compute_metrics((pred_output.predictions, pred_output.label_ids))
+					# TODO: this is a temporary code. It's because of manual length (2000) of prediction's ppi relation length. 
+					true_label_len = pred_output.label_ids.shape[1] 
+					
+									
+				
+					'''
+					print(task_name, pred_output.predictions)
+					print(task_name, pred_output.predictions.shape)
+					print(task_name, pred_output.predictions[:, :true_label_len, :])
+					print(task_name, pred_output.predictions[:, :true_label_len, :].shape)
+					print(task_name, pred_output.label_ids)
+					print(task_name, pred_output.label_ids.shape)
+					input('enter..')
+					'''
+					
+					
+					#result = compute_metrics((pred_output.predictions, pred_output.label_ids))
+					result = compute_metrics((pred_output.predictions[:, :true_label_len, :], pred_output.label_ids))
 					
 					with open(os.path.join(output_dir, data_name + '_' + learning_type + '_' + task_name + '_result.txt'), 'a') as fp:
 						out_s = 'cv ' if do_cross_validation else ''
@@ -770,6 +784,14 @@ def save_results(results_dict, data_list, task_list, label_list, output_dir, do_
 						all_results_per_data_and_task[data_name][task_name]['f1'].append(result['f1'])
 
 				elif task_name == 'ppi':
+					
+					'''
+					print('<ppi>', pred_output.predictions)
+					print('<ppi>', pred_output.predictions.shape)
+					print('<ppi>', pred_output.label_ids)
+					print('<ppi>', pred_output.predictions.shape)
+					input('enter...')
+					'''
 					
 					'''
 					print('preds_dict[task_name].predictions.shape:', preds_dict[task_name].predictions.shape)
@@ -944,7 +966,11 @@ def main():
 	else:
 		task_weights_val = {'ner': 1, 'ppi': 1}
 	
-	
+	if task_list[0] == 'joint-ner-ppi': # is_joint_learning is used when the results are saved.
+		is_joint_learning = True
+	else:
+		is_joint_learning = False
+
 	for model_name in model_list:
 	
 		model_args.model_name_or_path = model_name
@@ -1001,7 +1027,7 @@ def main():
 		sys.exit(1)
 		'''
 		
-		do_lower_case = True if "albert" in model_name else model_args.do_lower_case # huggingface all albert models are not case-sensitive.
+		do_lower_case = True if "albert" in model_name else model_args.do_lower_case # In huggingface, all albert models are not case-sensitive.
 
 
 		num_of_datasets = 1 # if not CV, there is only one dataset.
@@ -1030,13 +1056,15 @@ def main():
 			for task_name in task_list:
 				dataset_dict[task_name] = read_dataset(dataset_num, task_name, data_args)
 
-				if task_name == 'ner' or task_name == 'joint-ner-ppi': # label_list['ner'] is used when storing NER results.
+				if task_name == 'ner' or task_name == 'joint-ner-ppi': # label_list is used when the results are stored.
 					if 'ner' not in label_list:
 						if training_args.do_train:
 							label_list['ner'] = get_label_list(dataset_dict[task_name]["train"]["ner"])
 						else:
 							label_list['ner'] = get_label_list(dataset_dict[task_name]["test"]["ner"])	
-				
+					
+					if 'ppi-multiple' not in label_list:
+						label_list['ppi-multiple'] = data_args.ppi_classes
 				# this is not used for now.
 				'''
 				if task_name == 'ppi':
@@ -1083,7 +1111,7 @@ def main():
 				## commmented this to avoid an error when a model is fine-tuned. 07-12-2021
 				#if task_name == 'ppi' or task_name == 'joint-ner-ppi':
 				# all representations use entity markers except for STANDARD_cls_token. 
-				# STANDARD_mention_pooling needs entity markers to find entities in a sentence.
+				# STANDARD_mention_pooling and STANDARD_mention_pooling_plus_context need entity markers to find entities in a sentence.
 				if data_args.relation_representation != 'STANDARD_cls_token':
 					if do_lower_case:
 						tokenizer_dict[task_name].add_tokens(['[e1]', '[/e1]', '[e2]', '[/e2]'])
@@ -1203,56 +1231,6 @@ def main():
 				data_collator = DataCollatorForTokenClassification(tokenizer_dict['ppi'], pad_to_multiple_of=8 if training_args.fp16 else None)
 			else:
 				data_collator = DataCollatorForTokenClassification(list(tokenizer_dict.values())[0], pad_to_multiple_of=8 if training_args.fp16 else None)
-			
-			
-			
-			
-			
-			
-			'''
-			# Metrics
-			metric = load_metric("seqeval")
-			
-			ner_label_list = label_list['ner']
-	
-			def compute_metrics(p):
-				predictions, labels = p
-				predictions = np.argmax(predictions, axis=2)
-				
-
-				# ner_label_list: ['B-PROT', 'B-SPECIES', 'I-PROT', 'I-SPECIES', 'O']
-
-
-				# Remove ignored index (special tokens)
-				true_predictions = [
-					[ner_label_list[p] for (p, l) in zip(prediction, label) if l != -100]
-					for prediction, label in zip(predictions, labels)
-				]
-				true_labels = [
-					[ner_label_list[l] for (p, l) in zip(prediction, label) if l != -100]
-					for prediction, label in zip(predictions, labels)
-				]
-
-				results = metric.compute(predictions=true_predictions, references=true_labels)
-
-				with open(os.path.join(output_dir, str(dataset_num) + '_mtl_' + task_name + '_result.txt'), 'a') as fp:
-					fp.write(str(results))
-					#for k, v in results.items():
-					#	fp.write(k + ': ' + v + '\n')
-					fp.write('\n')
-			
-			
-				return {
-					"precision": results["overall_precision"],
-					"recall": results["overall_recall"],
-					"f1": results["overall_f1"],
-					"accuracy": results["overall_accuracy"],
-				}
-			'''
-			
-			
-			
-
 			
 			trainer = MultitaskTrainer(
 				model=multitask_model,
@@ -1402,7 +1380,8 @@ def main():
 					
 					# TODO: this needs to be fixed and made cleaner later.
 					if task_name == 'joint-ner-ppi':
- 
+						
+						
 						trainer.model.taskmodels_dict[task_name].finetuning_task = 'ner'
 						
 						preds_dict['ner'] = trainer.prediction_loop(
@@ -1410,17 +1389,42 @@ def main():
 												description=f"Test: {task_name}",
 											)
 						
+						''' ppi test data for single ppi prediction test.
 						test_dataloader = DataLoaderWithTaskname(
 											task_name,
 											trainer.get_test_dataloader(test_dataset=features_dict[task_name]["validation"])
 										  )
 									  
 						trainer.model.taskmodels_dict[task_name].finetuning_task = 'ppi'
-
+						
 						preds_dict['ppi'] = trainer.prediction_loop(
 												test_dataloader, 
 												description=f"Test: {task_name}",
 											)
+						'''
+						
+						
+						
+						trainer.model.taskmodels_dict[task_name].finetuning_task = 'joint-ner-ppi'
+
+						preds_dict['ppi-multiple'] = trainer.prediction_loop(
+														test_dataloader, 
+														description=f"Test: {task_name}",
+													)
+						
+						
+						
+						'''
+						print(preds_dict['ppi-multiple'].predictions)
+						print(preds_dict['ppi-multiple'].predictions.shape)
+						#print(preds_dict['ppi-multiple'].predictions[:, :true_label_len, :])
+						#print(preds_dict['ppi-multiple'].predictions[:, :true_label_len, :].shape)
+						print(preds_dict['ppi-multiple'].label_ids)
+						print(preds_dict['ppi-multiple'].label_ids.shape)
+						input('enter...')
+						'''
+						
+						
 					else:
 						if do_fine_tune:
 							preds_dict[task_name] = task_trainer.prediction_loop(
@@ -1429,9 +1433,9 @@ def main():
 													)
 						else:
 							preds_dict[task_name] = trainer.prediction_loop(
-													test_dataloader, 
-													description=f"Test: {task_name}",
-												)
+														test_dataloader, 
+														description=f"Test: {task_name}",
+													)
 						
 					datasets_dict[task_name] = test_dataloader.dataset
 			
@@ -1455,16 +1459,22 @@ def main():
 			if training_args.do_predict:
 				data_list.append('pred')
 
-			# TODO: this needs to be fixed and made cleaner later.
-			if task_name == 'joint-ner-ppi':
-				task_list = ['ner', 'ppi']
-				
-			save_results(results_dict, data_list, task_list, label_list, \
+			# TODO: this needs to be fixed and made cleaner later.				
+			if is_joint_learning:
+				#task_list = ['ner', 'ppi']
+				task_list = ['ner', 'ppi-multiple']
+				learning_type = 'joint' # hierarchical joint learning
+			elif len(task_list) > 1:
+				learning_type = 'mtl' # multi-task learning
+			else:
+				learning_type = 'stl' # single task learning
+			
+			save_results(results_dict, data_list, task_list, learning_type, label_list, \
 						 training_args.output_dir, \
 						 data_args.do_cross_validation, data_args.save_misclassified_samples)
 		
 		# TODO: this needs to be fixed and made cleaner later.
-		if task_name == 'joint-ner-ppi':
+		if is_joint_learning:
 			task_list = data_args.task_list
 
 
