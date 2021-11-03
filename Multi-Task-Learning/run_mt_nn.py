@@ -1073,7 +1073,7 @@ def main():
 				'''
 
 			# debugging
-			'''
+			
 			for task_name, dataset in dataset_dict.items():
 				print(task_name)
 				print(type(dataset["train"]))
@@ -1082,7 +1082,7 @@ def main():
 				print(dataset["train"][0])
 				print()
 				input('enter..')
-			'''
+			
 
 			# Set up tokenizers.
 			tokenizer_dict = {}
