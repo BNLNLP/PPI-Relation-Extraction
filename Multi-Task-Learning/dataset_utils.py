@@ -2,6 +2,7 @@ import os
 import sys
 import re
 import pickle
+import json
 import pandas as pd
 import numpy as np
 from datasets import ClassLabel, load_dataset, load_metric, Dataset, DatasetDict, concatenate_datasets
@@ -534,71 +535,85 @@ def read_dataset(dataset_num=0, task_name=None, data_args=None):
 	elif task_name == 'ppi':
 		data_dir = data_args.ppi_data
 			
-		#relations_path = os.path.join(data_dir, 'relations_' + str(dataset_num) + '.pkl')
-		train_path = os.path.join(data_dir, 'df_train_' + str(dataset_num) + '.pkl')
-		dev_path = os.path.join(data_dir, 'df_dev_' + str(dataset_num) + '.pkl')
-		test_path = os.path.join(data_dir, 'df_test_' + str(dataset_num) + '.pkl')
+		data_files = {}
+		data_files["train"] = os.path.join(data_dir, 'train_' + str(dataset_num) + '.json')
+		data_files["test"] = os.path.join(data_dir, 'test_' + str(dataset_num) + '.json')
+		if os.path.isfile(os.path.join(data_dir, 'dev_' + str(dataset_num) + '.json')):
+			data_files["validation"] = os.path.join(data_dir, 'dev_' + str(dataset_num) + '.json')
+			
+		extension = data_files["train"].split(".")[-1]
 		
-		#assert os.path.isfile(relations_path) and os.path.isfile(train_path) and os.path.isfile(test_path)
-		assert os.path.isfile(train_path) and os.path.isfile(test_path)
+		return load_dataset(extension, data_files=data_files)
 		
-		#rm = pickle.load(open(relations_path, "rb"))
-		df_train = pickle.load(open(train_path, "rb"))
-		df_dev = pickle.load(open(dev_path, "rb")) if os.path.isfile(dev_path) else None # optional
-		df_test = pickle.load(open(test_path, "rb"))
+		""" old code
+		elif task_name == 'ppi':
+			data_dir = data_args.ppi_data
+				
+			#relations_path = os.path.join(data_dir, 'relations_' + str(dataset_num) + '.pkl')
+			train_path = os.path.join(data_dir, 'df_train_' + str(dataset_num) + '.pkl')
+			dev_path = os.path.join(data_dir, 'df_dev_' + str(dataset_num) + '.pkl')
+			test_path = os.path.join(data_dir, 'df_test_' + str(dataset_num) + '.pkl')
+			
+			#assert os.path.isfile(relations_path) and os.path.isfile(train_path) and os.path.isfile(test_path)
+			assert os.path.isfile(train_path) and os.path.isfile(test_path)
+			
+			#rm = pickle.load(open(relations_path, "rb"))
+			df_train = pickle.load(open(train_path, "rb"))
+			df_dev = pickle.load(open(dev_path, "rb")) if os.path.isfile(dev_path) else None # optional
+			df_test = pickle.load(open(test_path, "rb"))
 
 
-		
-		# [START] Test code
-		"""
-		- double the size of data to compare with MTL. 05-17-2021
-		- This is to check if simply doubled PPI data performed better than MTL that has the same data size (NER + PPI).
-		- the result shows that MTL performed better than STL with the doubled size PPI data.
-		"""
-		'''
-		df_train = pd.concat([df_train, df_train])
-		df_test = pd.concat([df_test, df_test])
-		
-		# debugging
-		#pd.set_option('display.max_rows', None)
-		#pd.set_option('display.max_columns', None)
-		#pd.set_option('display.width', None)
-		#pd.set_option('display.max_colwidth', -1)
-		#for idx, row in df_train.iterrows():
-		#	if row['sents'].startswith('Mutagenesis studies of the human'):
-		#		print(row['sents'])
-		#		input('enter..')
-		'''
-		# [END] Test code
-		
-		
-		data_dict = DatasetDict()
+			
+			# [START] Test code
+			'''
+			- double the size of data to compare with MTL. 05-17-2021
+			- This is to check if simply doubled PPI data performed better than MTL that has the same data size (NER + PPI).
+			- the result shows that MTL performed better than STL with the doubled size PPI data.
+			'''
+			'''
+			df_train = pd.concat([df_train, df_train])
+			df_test = pd.concat([df_test, df_test])
+			
+			# debugging
+			#pd.set_option('display.max_rows', None)
+			#pd.set_option('display.max_columns', None)
+			#pd.set_option('display.width', None)
+			#pd.set_option('display.max_colwidth', -1)
+			#for idx, row in df_train.iterrows():
+			#	if row['sents'].startswith('Mutagenesis studies of the human'):
+			#		print(row['sents'])
+			#		input('enter..')
+			'''
+			# [END] Test code
+			
+			
+			data_dict = DatasetDict()
 
-		data_dict["train"] = Dataset.from_pandas(df_train)
-		data_dict["test"] = Dataset.from_pandas(df_test)
-		if df_dev is not None:
-			data_dict["validation"] = Dataset.from_pandas(df_dev)
-		
-		if data_args.relation_representation == 'STANDARD_cls_token':
-			def remove_entity_marker(example):
-				example['sents'] = example['sents'].replace("[E1]", '').replace("[/E1]", '').replace("[E2]", '').replace("[/E2]", '')
-				return example
-		
-			data_dict["train"] = data_dict["train"].map(remove_entity_marker)
-			data_dict["test"] = data_dict["test"].map(remove_entity_marker)
+			data_dict["train"] = Dataset.from_pandas(df_train)
+			data_dict["test"] = Dataset.from_pandas(df_test)
 			if df_dev is not None:
-				data_dict["validation"] = data_dict["validation"].map(remove_entity_marker)
+				data_dict["validation"] = Dataset.from_pandas(df_dev)
+			
+			if data_args.relation_representation == 'STANDARD_cls_token':
+				def remove_entity_marker(example):
+					example['sents'] = example['sents'].replace("[E1]", '').replace("[/E1]", '').replace("[E2]", '').replace("[/E2]", '')
+					return example
+			
+				data_dict["train"] = data_dict["train"].map(remove_entity_marker)
+				data_dict["test"] = data_dict["test"].map(remove_entity_marker)
+				if df_dev is not None:
+					data_dict["validation"] = data_dict["validation"].map(remove_entity_marker)
 
-		# debug
-		'''
-		for i in data_dict["train"]:
-			if not ("[E1]" or "[E2]") in i['sents']:
-				print(i)
-				input('enter...')		
-		'''
-		
-		return data_dict
-	
+			# debug
+			'''
+			for i in data_dict["train"]:
+				if not ("[E1]" or "[E2]") in i['sents']:
+					print(i)
+					input('enter...')		
+			'''
+			
+			return data_dict
+		"""
 	elif task_name == 'joint-ner-ppi':
 		data_dir = data_args.joint_ner_ppi_data
 
@@ -704,7 +719,7 @@ def get_num_of_labels(task_name=None, dataset_dict=None, training_args=None, dat
 		
 		
 	elif task_name == 'ppi':
-		return len(data_args.ppi_classes)
+		return len(json.load(open(data_args.relations)))
 
 
 ## [start] from NER
@@ -778,7 +793,7 @@ def get_entity_mention(tokenizer, x, e1_start_id, e2_start_id, e1_end_id, e2_end
 def tokenize_and_find_em(examples, tokenizer, relation_representation, e1_start_id, e2_start_id, e1_end_id, e2_end_id, padding):
 
 	tokenized_inputs = tokenizer(
-		examples['sents'],
+		examples['entity_marked_sent'],
 		padding=padding,
 		truncation=True,
 	)
@@ -843,7 +858,7 @@ def tokenize_and_find_em(examples, tokenizer, relation_representation, e1_start_
 
 			tokenized_inputs['entity_mention'] = adjusted_entity_mention
 
-	tokenized_inputs['labels'] = np.reshape(examples['relations_id'], (-1, 1)).tolist() # convert format. e.g., [0, 0] -> [[0], [0]]
+	tokenized_inputs['labels'] = np.reshape(examples['relation_id'], (-1, 1)).tolist() # convert format. e.g., [0, 0] -> [[0], [0]]
 	
 	# debug
 	''' 
@@ -1291,3 +1306,4 @@ def featurize_data(dataset_dict, tokenizer_dict, padding, data_args, do_lower_ca
 			"""
 	
 	return features_dict
+

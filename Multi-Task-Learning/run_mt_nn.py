@@ -9,6 +9,7 @@ import transformers
 #import nlp
 import dataclasses
 import shutil
+import json
 from torch.utils.data.dataloader import DataLoader
 #from transformers.training_args import is_tpu_available  # ImportError: cannot import name 'is_tpu_available' from 'transformers.training_args'
 #from transformers.trainer import get_tpu_sampler
@@ -106,7 +107,7 @@ class MultitaskModel(PreTrainedModel):
 				use_auth_token=True if model_args.use_auth_token else None,
 				
 				relation_representation=data_args.relation_representation,
-				num_ppi_labels=len(data_args.ppi_classes),
+				num_ppi_labels=len(json.load(open(data_args.relations))),
 				tokenizer=tokenizer_dict[task_name],
 				task_weights=task_weights_dict
 
@@ -512,10 +513,8 @@ class DataTrainingArguments:
 						   This is a step after multi-task learning, which replaces a task head with a new one. \
 						   This option is only needed for multi-task learning."}
 	)
-	# explicitly define classes since a dataset may not contain all classes in which case Relation_Mapper assigns overlapped relation ids.
-	ppi_classes: List[str] = field(
-		default_factory=lambda: ['enzyme', 'structural', 'negative'],
-		metadata={"help": "a list of PPI classes."},
+	relations: str = field(
+		default=None, metadata={"help": "Relation file (name and id)."}
 	)
 	relation_representation: str = field(
 		default='EM_entity_start',
@@ -1037,6 +1036,8 @@ def main():
 		results_dict = {} # store prediction results for each dataset and task.
 		label_list = {} # label_list['ner'] is used when storing NER results.
 		
+		relations = json.load(open(data_args.relations))
+
 		for dataset_num in range(num_of_datasets):
 			logger.info("\n\n*** Dataset number: " + str(dataset_num) + " ***\n\n")
 
@@ -1064,16 +1065,16 @@ def main():
 							label_list['ner'] = get_label_list(dataset_dict[task_name]["test"]["ner"])	
 					
 					if 'ppi-multiple' not in label_list:
-						label_list['ppi-multiple'] = data_args.ppi_classes
+						label_list['ppi-multiple'] = relations.keys()
 				# this is not used for now.
 				'''
 				if task_name == 'ppi':
 					if 'ppi' not in label_list:
-						label_list['ppi'] = data_args.ppi_classes
+						label_list['ppi'] = relations.keys()
 				'''
 
 			# debugging
-			
+			'''
 			for task_name, dataset in dataset_dict.items():
 				print(task_name)
 				print(type(dataset["train"]))
@@ -1082,7 +1083,7 @@ def main():
 				print(dataset["train"][0])
 				print()
 				input('enter..')
-			
+			'''
 
 			# Set up tokenizers.
 			tokenizer_dict = {}
@@ -1353,7 +1354,7 @@ def main():
 					if do_fine_tune:
 						task_model = AutoModelForTokenClassification.from_pretrained(os.path.join(training_args.output_dir, task_name),
 																					 relation_representation=data_args.relation_representation,
-																					 num_ppi_labels=len(data_args.ppi_classes),
+																					 num_ppi_labels=len(relations),
 																					 tokenizer=tokenizer_dict[task_name],
 																					 task_weights={'ner': 1, 'ppi': 1},)
 

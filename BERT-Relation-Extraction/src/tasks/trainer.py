@@ -55,9 +55,9 @@ def train_and_fit(args, dataset_num):
 		lower_case = True
 		model_name = 'BERT'
 		net = Model.from_pretrained(model, force_download=False, \
-								model_size=args.model_size,
-								task='classification' if args.task != 'fewrel' else 'fewrel',\
-								n_classes_=args.num_classes)
+									model_size=args.model_size,
+									task='classification' if args.task != 'fewrel' else 'fewrel',\
+									n_classes_=args.num_classes)
 	elif args.model_no == 1:
 		from ..model.ALBERT.modeling_albert import AlbertModel as Model
 		model = args.model_size #'albert-base-v2'
