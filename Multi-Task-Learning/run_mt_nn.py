@@ -670,7 +670,8 @@ def evaluate_results(net, test_loader, pad_id, cuda):
 ## [end] from PPI	
 
 
-def save_results(results_dict, data_list, task_list, learning_type, label_list, output_dir, do_cross_validation, save_misclassified_samples):
+def save_results(results_dict, data_list, task_list, learning_type, label_list, output_dir, \
+				 do_cross_validation, save_misclassified_samples, relations):
 	
 	if do_cross_validation:
 		all_results_per_data_and_task = {}
@@ -834,42 +835,40 @@ def save_results(results_dict, data_list, task_list, learning_type, label_list, 
 								else:
 									miscls_samples_per_data_and_task[data_name][task_name][key] = [miscls_sent]
 
-					
-					# debug
-					#print('pred:', pred)
-					#print('pred[0]:', pred[0])
-					#print('true:', true)
-
-					enzyme_cnt = 0
-					structural_cnt = 0
-					negative_cnt = 0
-					
+					pred_type_counter = {}
 					for label in pred:
-						if label == 0:
-							enzyme_cnt += 1
-						elif label == 1:
-							structural_cnt += 1
-						elif label == 2:
-							negative_cnt += 1
+						if label.item() in pred_type_counter:
+							pred_type_counter[label.item()] += 1
+						else:
+							pred_type_counter[label.item()] = 1
+
+					pred_stat = 'pred - '
+					for id, cnt in pred_type_counter.items():
+						for rel_name, info in relations.items():
+							if info['id'] == id:
+								id_to_name = rel_name
+								break
+						pred_stat += id_to_name + ': ' + str(cnt) + ' / '
 					
-					pred_stat = 'pred - enzyme_cnt: ' + str(enzyme_cnt) + ' / structural_cnt: ' + str(structural_cnt) + ' / negative_cnt: ' \
-								   + str(negative_cnt) + ' / total: ' + str(enzyme_cnt + structural_cnt + negative_cnt)
+					pred_stat += 'total: ' + str(sum(pred_type_counter.values()))
 					
-					enzyme_cnt = 0
-					structural_cnt = 0
-					negative_cnt = 0
-					
+					true_type_counter = {}
 					for label in true:
-						if label == 0:
-							enzyme_cnt += 1
-						elif label == 1:
-							structural_cnt += 1
-						elif label == 2:
-							negative_cnt += 1
-							
-					true_stat = 'true - enzyme_cnt: ' + str(enzyme_cnt) + ' / structural_cnt: ' + str(structural_cnt) + ' / negative_cnt: ' \
-								   + str(negative_cnt) + ' / total: ' + str(enzyme_cnt + structural_cnt + negative_cnt)
+						if label.item() in true_type_counter:
+							true_type_counter[label.item()] += 1
+						else:
+							true_type_counter[label.item()] = 1
 					
+					true_stat = 'true - '
+					for id, cnt in true_type_counter.items():
+						for rel_name, info in relations.items():
+							if info['id'] == id:
+								id_to_name = rel_name
+								break
+						true_stat += id_to_name + ': ' + str(cnt) + ' / '
+					
+					true_stat += 'total: ' + str(sum(true_type_counter.values()))
+
 					from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
 
 					# LBERT used micro scores. I also tested with micro scores, but it wan't quite different from weighted. 	
@@ -1066,6 +1065,7 @@ def main():
 					
 					if 'ppi-multiple' not in label_list:
 						label_list['ppi-multiple'] = relations.keys()
+				
 				# this is not used for now.
 				'''
 				if task_name == 'ppi':
@@ -1472,7 +1472,7 @@ def main():
 			
 			save_results(results_dict, data_list, task_list, learning_type, label_list, \
 						 training_args.output_dir, \
-						 data_args.do_cross_validation, data_args.save_misclassified_samples)
+						 data_args.do_cross_validation, data_args.save_misclassified_samples, relations)
 		
 		# TODO: this needs to be fixed and made cleaner later.
 		if is_joint_learning:

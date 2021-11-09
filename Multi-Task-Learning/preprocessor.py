@@ -291,11 +291,16 @@ def get_samples_from_biocreative_type(file, num_of_sample=None):
 					
 					relation_id = 0 if relation_type == 'enzyme' else 1
 					
-					sample = {'pair_id': unique_id,
+					sample = {'pair_id': pair_id,
+							  'sent_id': sent_id, # pair_id and sent_id are the same in BioCreative Typed annotation.
 							  'entity_marked_sent': tagged_sent,
 							  'relation': relation_type,
 							  'relation_id': relation_id,
-							  'sent_id': unique_id} # pair_id and sent_id are the same in BioCreative Typed annotation.
+							  'directed': False, # relation directionality. a.k.a symmetric or asymmetric relation.
+							  'reverse': False} # this is only used for undirected relations. 
+												# For testing phase, undirected samples are replicated, and the replicated samples are tagged as reverse. 
+												# So, if it's set to true, the model uses the second entity + the first entity instead of 
+												# the first entity + the second entity to classify both relation representation cases (A + B, B + A). 
 
 					if doc_num in samples:
 						samples[doc_num].append(sample)
@@ -643,10 +648,15 @@ def get_samples_from_ppi_benchmark(file):
 				relation_id = 0 if pair_interaction == 'True' else 1
 
 				sample = {'pair_id': pair_id,
+						  'sent_id': sent_id,
 						  'entity_marked_sent': tagged_sent,
 						  'relation': relation_type,
 						  'relation_id': relation_id,
-						  'sent_id': sent_id}
+						  'directed': False, # relation directionality. a.k.a symmetric or asymmetric relation.
+						  'reverse': False} # this is only used for undirected relations. 
+											# For testing phase, undirected samples are replicated, and the replicated samples are tagged as reverse. 
+											# So, if it's set to true, the model uses the second entity + the first entity instead of 
+											# the first entity + the second entity to classify both relation representation cases (A + B, B + A). 
 
 				if doc_id in samples:
 					samples[doc_id].append(sample)
@@ -765,12 +775,22 @@ def store_data(dir, train, dev, test, idx=0):
 	with open(outfile, "w") as f: 
 		f.write(train_txt)
 	
+	
+	"""
+	For development (validation) and test data, undirectional relation samples are replicated with reverse = True,
+	so that the model classifies both relation representation cases (A + B, B + A). 
+	"""
 	if dev is not None:
 		dev_txt = ''
 		for doc_samples in dev:
 			for sample in doc_samples:
 				dev_txt += json.dumps(sample)
 				dev_txt += '\n'
+				
+				if sample['directed'] is False:
+					sample['reverse'] = True
+					dev_txt += json.dumps(sample)
+					dev_txt += '\n'
 		
 		outfile = os.path.join(dir, 'dev_' + str(idx) + '.json')
 		with open(outfile, "w") as f: 
@@ -781,6 +801,11 @@ def store_data(dir, train, dev, test, idx=0):
 		for sample in doc_samples:
 			test_txt += json.dumps(sample)
 			test_txt += '\n'
+			
+			if sample['directed'] is False:
+				sample['reverse'] = True
+				test_txt += json.dumps(sample)
+				test_txt += '\n'
 
 	outfile = os.path.join(dir, 'test_' + str(idx) + '.json')
 	with open(outfile, "w") as f: 

@@ -15,12 +15,12 @@ do
 			#export DATA1=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/BioInfer/BioInferCLAnalysis_split_SMBM_version.xml
 			#export DATA1=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/HPRD50/HPRD50.xml			
 			#export DATA1=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/IEPA/IEPA.xml
-			#export DATA1=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/LLL/LLL.xml
+			export DATA1=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/LLL/LLL.xml
 			
 			# Type annotated datasets (labels: enzyme, structural, negative) - DATA1: positive (enzyme, structurel), DATA2: negative
 			# Negative annotations - WARNING!! DO NOT forget to change the code in preprocessing_funcs.py (set neg_sample_processing = True) !!! 
 
-			export DATA1=~/BER-NLP/Multi-Task-Learning/datasets/ppi/type_annotation/BioCreative_type/01_27_2021/IKB_Sean_BioCreative_full_text_annotation.txt
+			#export DATA1=~/BER-NLP/Multi-Task-Learning/datasets/ppi/type_annotation/BioCreative_type/01_27_2021/IKB_Sean_BioCreative_full_text_annotation.txt
 			
 			#export DATA1=~/BER-NLP/Multi-Task-Learning/datasets/ppi/type_annotation/AImed_type/aimed_type_annotations_srm.tsv
 			#export DATA2=~/BER-NLP/Multi-Task-Learning/datasets/ppi/type_annotation/AImed_type/passed_full_aimed_training_ikb.tsv
@@ -46,7 +46,7 @@ do
 
 			python ~/BER-NLP/Multi-Task-Learning/preprocessor.py \
 				--data_list $DATA1 \
-				--task=BioCreative_type \
+				--task=PPIbenchmark \
 				--do_cross_validation \
 				--num_of_folds=10 \
 				--ratio=k-folds
@@ -134,8 +134,10 @@ do
 			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ppi/type_annotation/ALL/all_incl_only_AImed_negative
 			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ppi/type_annotation/ALL/all_incl_only_AImed_HPRD50_IEPA_negative
 			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ppi/type_annotation/ALL/all_incl_only_AImed_ikb_HPRD50_IEPA_negative
-			export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ppi/type_annotation/ALL/all_incl_negative_annotation_ver_17
+			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ppi/type_annotation/ALL/all_incl_negative_annotation_ver_17
 			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ppi/type_annotation/AImed_type/all_with_negative_annotation
+			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ade/converted
+			export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/conll04/converted
 			
 			#export JOINT_NER_PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/original/AImed/all_ver_3
 			#export JOINT_NER_PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/original/BioInfer/all
@@ -150,32 +152,33 @@ do
 			#export JOINT_NER_PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/type_annotation/ALL/all_incl_negative_annotation_ver_17
 			#export JOINT_NER_PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/type_annotation/AImed_type/all_with_negative_annotation
 			
-			export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/ppi_incl_negative_annotation_ver_17_transformers_ver_4_12_0_json
+			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/ppi_incl_negative_annotation_ver_17_transformers_ver_4_12_0_json_adding_both_directions_2
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/ppi_incl_negative_annotation_ver_17_transformers_ver_4_12_0
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/AImed/ver_3/orig_AImed_mtl_EM_entity_start_transformers_ver_4_12_0
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/BioInfer/ver_3/orig_BioInfer_ner
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/HPRD50/ver_2/orig_HPRD50_ner
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/IEPA/ver_1/orig_IEPA_ner
-			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/LLL/ver_5/orig_LLL_ppi_EM_entity_start_transformers_ver_4_12_0_json
+			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/LLL/ver_5/orig_LLL_ppi_EM_entity_start_transformers_ver_4_12_0_json_adding_both_directions
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/LLL/ver_5_separate/orig_LLL_joint_STANDARD_mention_pooling_plus_context_epoch_30
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/original_with_bnl_ner/LLL
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/separate_data_for_ner_ppi_tasks_no_em
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/ppi_data_for_both_ner_ppi_tasks_no_em
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/ppi_data_for_both_ner_ppi_tasks_with_ner_filtering
+			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/ADE/ppi_EM_entity_start_transformers_ver_4_12_0_json_adding_both_directions
+			export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/CoNLL04/ppi_STANDARD_mention_pooling_plus_context_ppp_transformers_ver_4_12_0_json_adding_both_directions
 			
 			#export RELATIONS=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/relations.json
-			export RELATIONS=~/BER-NLP/Multi-Task-Learning/datasets/ppi/type_annotation/relations.json
-			
+			#export RELATIONS=~/BER-NLP/Multi-Task-Learning/datasets/ppi/type_annotation/relations.json
+			#export RELATIONS=~/BER-NLP/Multi-Task-Learning/datasets/ade/converted/relations.json
+			export RELATIONS=~/BER-NLP/Multi-Task-Learning/datasets/conll04/converted/relations.json
 			
 			
 			#srun -p volta -A nlp-sbu -t 24:00:00 -N 1 --gres=gpu:2 -J mtl \
 			#srun -p voltadebug -A nlp-sbu -t 4:00:00 -N 1 --gres=gpu:2 -J mtl \
-
-			#srun -p volta -A nlp-sbu -t 24:00:00 -N 1 --gres=gpu:2 -J mtl \
 			
 			srun -p volta -A nlp-sbu -t 24:00:00 -N 1 --gres=gpu:2 -J mtl \
 			python ~/BER-NLP/Multi-Task-Learning/run_mt_nn.py \
-				--model_list albert-base-v2 dmis-lab/biobert-base-cased-v1.1 \
+				--model_list bert-base-cased \
 				--task_list ppi \
 				--do_lower_case=False \
 				--ner_data $NER_DATA \
@@ -186,9 +189,8 @@ do
 				--do_train \
 				--do_predict \
 				--num_train_epochs=10 \
-				--do_cross_validation \
 				--num_of_folds=10 \
-				--relation_representation EM_entity_start \
+				--relation_representation STANDARD_mention_pooling_plus_context \
 				--remove_unused_columns=False \
 				--seed $SEED \
 				--save_steps=9000 \

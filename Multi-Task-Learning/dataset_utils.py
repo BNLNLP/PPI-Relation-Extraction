@@ -860,6 +860,9 @@ def tokenize_and_find_em(examples, tokenizer, relation_representation, e1_start_
 
 	tokenized_inputs['labels'] = np.reshape(examples['relation_id'], (-1, 1)).tolist() # convert format. e.g., [0, 0] -> [[0], [0]]
 	
+	tokenized_inputs['directed'] = np.reshape(examples['directed'], (-1, 1)).tolist() 
+	tokenized_inputs['reverse'] = np.reshape(examples['reverse'], (-1, 1)).tolist()
+
 	# debug
 	''' 
 	for i in tokenized_inputs:
@@ -1116,7 +1119,7 @@ def featurize_data(dataset_dict, tokenizer_dict, padding, data_args, do_lower_ca
 		#"rte": ['input_ids', 'attention_mask', 'labels'],
 		#"commonsense_qa": ['input_ids', 'attention_mask', 'labels'],
 		"ner": ['input_ids', 'attention_mask', 'labels', 'token_type_ids'],
-		"ppi": ['input_ids', 'attention_mask', 'labels', 'token_type_ids'],
+		"ppi": ['input_ids', 'attention_mask', 'labels', 'token_type_ids', 'directed', 'reverse'],
 		"joint-ner-ppi": ['input_ids', 'attention_mask', 'labels', 'token_type_ids', 'ppi_relations'],
 	}
 
