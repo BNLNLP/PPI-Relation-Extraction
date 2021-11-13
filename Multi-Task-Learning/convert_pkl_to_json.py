@@ -8,8 +8,8 @@ import pandas as pd
 import json
 
 
-#pkl_dir = 'datasets/ppi/original/LLL/all_ver_5'
-pkl_dir = 'datasets/ppi/type_annotation/ALL/all_incl_negative_annotation_ver_17'
+pkl_dir = 'datasets/ppi/original/LLL/all_ver_5'
+#pkl_dir = 'datasets/ppi/type_annotation/ALL/all_incl_negative_annotation_ver_17'
 
 for pkl_file in os.listdir(pkl_dir):
 	if not pkl_file.startswith('df_'): # skip relations files.

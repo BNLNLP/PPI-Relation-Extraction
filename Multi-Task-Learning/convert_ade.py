@@ -23,9 +23,9 @@ for file in os.listdir(data_dir):
 		relations = item['relations']
 		orig_id = item['orig_id']
 		
-		
-		for num, rel in enumerate(relations, start=1):
-			type = rel['type']
+		rel_list = []
+		for rel in relations:
+			rel_type = rel['type']
 			head = rel['head']
 			tail = rel['tail']
 			
@@ -33,14 +33,6 @@ for file in os.listdir(data_dir):
 			e1_end = entities[head]['end']
 			e2_start = entities[tail]['start']
 			e2_end = entities[tail]['end']
-			
-			entity_marked_sent = tokens.copy()
-			
-			entity_marked_sent[e1_start] = '[E1]' + entity_marked_sent[e1_start]
-			entity_marked_sent[e1_end-1] = entity_marked_sent[e1_end-1] + '[/E1]'
-			
-			entity_marked_sent[e2_start] = '[E2]' + entity_marked_sent[e2_start]
-			entity_marked_sent[e2_end-1] = entity_marked_sent[e2_end-1] + '[/E2]'
 
 			# debug - checking overlapped entities (overlapped entities exist!!)
 			'''
@@ -49,19 +41,24 @@ for file in os.listdir(data_dir):
 				input('enter...')
 			'''
 			
-			relation_id = 0 # ADE has a single class.
+			rel_id = 0 # ADE has a single class.
 			
-			output_txt += json.dumps({"pair_id": str(orig_id) + '_' + str(num),
-									  "sent_id": str(orig_id),
-									  "entity_marked_sent": ' '.join(entity_marked_sent),
-									  "relation": type,
-									  "relation_id": relation_id,
-									  "directed": True, # relation directionality. a.k.a symmetric or asymmetric relation.
-									  "reverse": False}) # this is only used for undirected relations. 
-													   # For testing phase, undirected samples are replicated, and the replicated samples are tagged as reverse. 
-													   # So, if it's set to true, the model uses the second entity + the first entity instead of 
-													   # the first entity + the second entity to classify both relation representation cases (A + B, B + A). 
-			output_txt += '\n'
+			rel_list.append({'rel_id': rel_id, 
+							 'rel_type': rel_type, 
+							 'entity_1': tokens[e1_start:e1_end],
+							 'entity_1_idx': (e1_start, e1_end),
+							 'entity_2': tokens[e2_start:e2_end],
+							 'entity_2_idx': (e2_start, e2_end)})
+
+		output_txt += json.dumps({"id": orig_id,
+								  "tokens": tokens,
+								  "relation": rel_list,
+								  "directed": True, # relation directionality. a.k.a symmetric or asymmetric relation.
+								  "reverse": False}) # this is only used for undirected relations. 
+												   # For testing phase, undirected samples are replicated, and the replicated samples are tagged as reverse. 
+												   # So, if it's set to true, the model uses the second entity + the first entity instead of 
+												   # the first entity + the second entity to classify both relation representation cases (A + B, B + A). 
+		output_txt += '\n'
 			
 	data_type = file.rsplit('_', 1)[1].replace('.json', '')
 	data_num = file.rsplit('_', 2)[1]
