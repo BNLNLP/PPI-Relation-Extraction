@@ -1678,6 +1678,127 @@ import re
 # [GP][END]
 
 
+
+
+class PredicateAttention(nn.Module):
+	def __init__(self, config):
+		super().__init__()
+		if config.hidden_size % config.num_attention_heads != 0 and not hasattr(config, "embedding_size"):
+			raise ValueError(
+				f"The hidden size ({config.hidden_size}) is not a multiple of the number of attention "
+				f"heads ({config.num_attention_heads})"
+			)
+
+		self.num_attention_heads = config.num_attention_heads
+		self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
+		self.all_head_size = self.num_attention_heads * self.attention_head_size
+
+		self.query = nn.Linear(config.hidden_size, self.all_head_size)
+		self.key = nn.Linear(config.hidden_size, self.all_head_size)
+		self.value = nn.Linear(config.hidden_size, self.all_head_size)
+		
+		
+		
+		print(config.hidden_size)
+		print(self.num_attention_heads)
+		print(self.attention_head_size)
+		print(self.all_head_size)
+		input('enter..')
+		
+		
+
+		self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
+		
+		self.is_decoder = config.is_decoder
+
+	def transpose_for_scores(self, x):
+		new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+		x = x.view(*new_x_shape)
+		return x.permute(0, 2, 1, 3)
+
+	def forward(
+		self,
+		hidden_states,
+		attention_mask=None,
+		head_mask=None,
+		encoder_hidden_states=None,
+		encoder_attention_mask=None,
+		past_key_value=None,
+		output_attentions=False,
+	):
+		mixed_query_layer = self.query(hidden_states)
+
+		# If this is instantiated as a cross-attention module, the keys
+		# and values come from an encoder; the attention mask needs to be
+		# such that the encoder's padding tokens are not attended to.
+		is_cross_attention = encoder_hidden_states is not None
+
+		if is_cross_attention and past_key_value is not None:
+			# reuse k,v, cross_attentions
+			key_layer = past_key_value[0]
+			value_layer = past_key_value[1]
+			attention_mask = encoder_attention_mask
+		elif is_cross_attention:
+			key_layer = self.transpose_for_scores(self.key(encoder_hidden_states))
+			value_layer = self.transpose_for_scores(self.value(encoder_hidden_states))
+			attention_mask = encoder_attention_mask
+		elif past_key_value is not None:
+			key_layer = self.transpose_for_scores(self.key(hidden_states))
+			value_layer = self.transpose_for_scores(self.value(hidden_states))
+			key_layer = torch.cat([past_key_value[0], key_layer], dim=2)
+			value_layer = torch.cat([past_key_value[1], value_layer], dim=2)
+		else:
+			key_layer = self.transpose_for_scores(self.key(hidden_states))
+			value_layer = self.transpose_for_scores(self.value(hidden_states))
+
+		query_layer = self.transpose_for_scores(mixed_query_layer)
+
+		if self.is_decoder:
+			# if cross_attention save Tuple(torch.Tensor, torch.Tensor) of all cross attention key/value_states.
+			# Further calls to cross_attention layer can then reuse all cross-attention
+			# key/value_states (first "if" case)
+			# if uni-directional self-attention (decoder) save Tuple(torch.Tensor, torch.Tensor) of
+			# all previous decoder key/value_states. Further calls to uni-directional self-attention
+			# can concat previous decoder key/value_states to current projected key/value_states (third "elif" case)
+			# if encoder bi-directional self-attention `past_key_value` is always `None`
+			past_key_value = (key_layer, value_layer)
+
+		# Take the dot product between "query" and "key" to get the raw attention scores.
+		attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
+
+
+		attention_scores = attention_scores / math.sqrt(self.attention_head_size)
+		if attention_mask is not None:
+			# Apply the attention mask is (precomputed for all layers in BertModel forward() function)
+			attention_scores = attention_scores + attention_mask
+
+		# Normalize the attention scores to probabilities.
+		attention_probs = nn.Softmax(dim=-1)(attention_scores)
+
+		# This is actually dropping out entire tokens to attend to, which might
+		# seem a bit unusual, but is taken from the original Transformer paper.
+		attention_probs = self.dropout(attention_probs)
+
+		# Mask heads if we want to
+		if head_mask is not None:
+			attention_probs = attention_probs * head_mask
+
+		context_layer = torch.matmul(attention_probs, value_layer)
+
+		context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+		new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
+		context_layer = context_layer.view(*new_context_layer_shape)
+
+		outputs = (context_layer, attention_probs) if output_attentions else (context_layer,)
+
+		if self.is_decoder:
+			outputs = outputs + (past_key_value,)
+		return outputs
+
+
+
+
+
 @add_start_docstrings(
 	"""
 	Bert Model with a token classification head on top (a linear layer on top of the hidden-states output) e.g. for
@@ -1712,13 +1833,81 @@ class BertForTokenClassification(BertPreTrainedModel):
 			if self.relation_representation in ['STANDARD_mention_pooling', 'EM_entity_start']:
 				# double sized input for prediction head for PPI task since it concats two embeddings. 04-04-2021
 				self.rel_classifier = nn.Linear(config.hidden_size*2, config.num_labels)
-			elif self.relation_representation in ['STANDARD_mention_pooling_plus_context', 'EM_entity_start_plus_context']:
+			elif self.relation_representation in ['STANDARD_mention_pooling_plus_context', 'EM_entity_start_plus_context',
+												  'POSITIONAL_mention_pooling_plus_context']:
 				
 				
 				
 				
+				"""
+				Caution!! 11-11-2021
+				If any nn.Linear is not used, comment them even if they are not used. For some reason, the nn.Linear affects the performance.
+				For instance, when self.span_classifier is alive even though it's not used, the results are different. 
+				"""
+				self.enable_mention_pooling_and_context = True
+				self.enable_predicate_span = True
+				self.enable_pos_emb_loss = True
+				self.enable_ffnn_for_rep = False
+				
+				if self.enable_mention_pooling_and_context:
+					#self.span_width_embeddings = nn.Embedding(100, config.hidden_size)
+					
+					
+					self.predicate_attention = PredicateAttention(config)
+					
+					
+					
+					
+					if self.enable_ffnn_for_rep:
+						# TODO: make it cleaner.
+						if (self.enable_predicate_span and self.enable_pos_emb_loss == False) or \
+						   (self.enable_predicate_span == False and self.enable_pos_emb_loss):
+							num_of_concat_embeds = 2
+						else:
+							num_of_concat_embeds = 3
+					else:
+						# TODO: complete this.
+						num_of_concat_embeds = 4
+
+					self.rel_classifier = nn.Linear(config.hidden_size*num_of_concat_embeds, config.num_labels)
+				
+				if self.enable_pos_emb_loss:
+					self.pos_diff_embeddings = nn.Embedding(1000, config.hidden_size)
+				
+				if self.enable_ffnn_for_rep:
+					if self.enable_predicate_span or self.enable_pos_emb_loss:
+						num_of_concat_mention_context_span_embeds = 3
+						context_funct_hidden_size = num_of_concat_mention_context_span_embeds*4
+						self.context_funct_h1 = nn.Linear(config.hidden_size*num_of_concat_mention_context_span_embeds, config.hidden_size*context_funct_hidden_size)
+						#self.context_funct_h2 = nn.Linear(config.hidden_size*context_funct_hidden_size, config.hidden_size*context_funct_hidden_size)
+						self.context_funct_o = nn.Linear(config.hidden_size*context_funct_hidden_size, config.hidden_size)
+						self.context_act_funct = nn.GELU()
+						self.context_layer_norm = nn.LayerNorm(config.hidden_size*context_funct_hidden_size, eps=config.layer_norm_eps)
+					
+					if self.enable_predicate_span:
+						num_of_concat_predicate_span_embeds = 3
+						predicate_funct_hidden_size = num_of_concat_predicate_span_embeds*4
+						self.predicate_funct_h1 = nn.Linear(config.hidden_size*num_of_concat_predicate_span_embeds, config.hidden_size*predicate_funct_hidden_size)
+						#self.predicate_funct_h2 = nn.Linear(config.hidden_size*predicate_funct_hidden_size, config.hidden_size*predicate_funct_hidden_size)
+						self.predicate_funct_o = nn.Linear(config.hidden_size*predicate_funct_hidden_size, config.hidden_size)
+						self.predicate_act_funct = nn.GELU()
+						self.predicate_layer_norm = nn.LayerNorm(config.hidden_size*predicate_funct_hidden_size, eps=config.layer_norm_eps)
+
+					if self.enable_pos_emb_loss:
+						num_of_concat_span_embeds = 2
+						#self.span_classifier = nn.Linear(config.hidden_size*num_of_concat_span_embeds, config.num_labels)
+						
+						pos_emb_funct_hidden_size = num_of_concat_span_embeds*4
+						self.pos_emb_funct_h1 = nn.Linear(config.hidden_size*num_of_concat_span_embeds, config.hidden_size*pos_emb_funct_hidden_size)
+						#self.pos_emb_funct_h2 = nn.Linear(config.hidden_size*pos_emb_funct_hidden_size, config.hidden_size*pos_emb_funct_hidden_size)
+						self.pos_emb_funct_o = nn.Linear(config.hidden_size*pos_emb_funct_hidden_size, config.hidden_size)
+						self.pos_emb_act_funct = nn.GELU()
+						self.pos_emb_layer_norm = nn.LayerNorm(config.hidden_size*pos_emb_funct_hidden_size, eps=config.layer_norm_eps)
+						
+					
+				
+				'''
 				# representation function.
-				num_of_concat_embeds = 4
 				rep_funct_hidden_size = num_of_concat_embeds*4
 				self.rep_funct_h1 = nn.Linear(config.hidden_size*num_of_concat_embeds, config.hidden_size*rep_funct_hidden_size)
 				self.rep_funct_h2 = nn.Linear(config.hidden_size*rep_funct_hidden_size, config.hidden_size*rep_funct_hidden_size)
@@ -1728,18 +1917,10 @@ class BertForTokenClassification(BertPreTrainedModel):
 				self.LayerNorm = nn.LayerNorm(config.hidden_size*rep_funct_hidden_size, eps=config.layer_norm_eps)
 				self.dropout = nn.Dropout(config.hidden_dropout_prob)
 				
-				# triple sized input for prediction head for PPI task since it concats three embeddings. 05-03-2021
-				#self.rel_classifier = nn.Linear(config.hidden_size*3, config.num_labels)
-				
-				#self.rel_classifier = nn.Linear(config.hidden_size*num_of_concat_embeds, config.num_labels)
-				
 				self.rel_classifier = nn.Linear(config.hidden_size, config.num_labels)
 				
-				
-				
-				
-				
-				
+				'''
+
 				
 				
 			else:
@@ -1788,6 +1969,15 @@ class BertForTokenClassification(BertPreTrainedModel):
 		# [GP][END] - added a mention pooling parameter for PPI task. 04-25-2021
 		
 		ppi_relations=None,	
+		
+		
+		relations=None,
+		
+		predicates=None,
+		
+		
+		directed=None,
+		reverse=None,
 
 	):
 		r"""
@@ -1841,10 +2031,21 @@ class BertForTokenClassification(BertPreTrainedModel):
 						active_loss, labels.view(-1), torch.tensor(loss_fct.ignore_index).type_as(labels)
 					)
 					loss = loss_fct(active_logits, active_labels)
+		
+					'''
+					print('sequence_output.shape:', sequence_output.shape)
+					print('logits.shape:', logits.shape)
+					print('labels.shape:', labels.shape)
+					print('active_logits.shape:', active_logits.shape)
+					print('active_labels.shape:', active_labels.shape)
+					input('enter...')
+					'''
+
 				else:
 					loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 				
 				#loss = self.ner_weight*loss
+
 
 		elif self.finetuning_task == 'ppi':
 			
@@ -1856,14 +2057,53 @@ class BertForTokenClassification(BertPreTrainedModel):
 
 				buffer = []
 				for i in range(blankv1v2.shape[0]): # iterate batch & collect
+					
 					v1v2 = blankv1v2[i, i, :, :]
 					v1v2 = torch.cat((v1v2[0], v1v2[1]))
 					buffer.append(v1v2)
+						
+						
+					if self.training: # if it's training,
+						
+
+						# For undirected (symmetric) relations, consider both A-B and B-A. 11-05-2021
+						if directed[i] == False:
+							v2v1 = blankv1v2[i, i, :, :]
+							v2v1 = torch.cat((v2v1[1], v2v1[0]))
+							buffer.append(v2v1)
+							
+							first_half = labels[0:i,:]
+							second_half = labels[i:,:]
+							i_label = torch.unsqueeze(labels[i,:], 0)
+							labels = torch.cat([first_half, i_label, second_half], 0)
+					
+					'''
+					
+					else:
+						if reverse[i] == False:
+							v1v2 = blankv1v2[i, i, :, :]
+							v1v2 = torch.cat((v1v2[0], v1v2[1]))
+							buffer.append(v1v2)
+						else:
+							v2v1 = blankv1v2[i, i, :, :]
+							v2v1 = torch.cat((v2v1[1], v2v1[0]))
+							buffer.append(v2v1)
+					'''	
+
+
+
+
 				del blankv1v2
 				v1v2 = torch.stack([a for a in buffer], dim=0)
 				del buffer
 	
 				logits = self.rel_classifier(v1v2)
+				
+				
+				
+				
+				
+				
 
 			elif self.relation_representation == 'EM_entity_start_plus_context':
 				buffer = []
@@ -2137,15 +2377,6 @@ class BertForTokenClassification(BertPreTrainedModel):
 				z = self.dropout(z)
 
 				logits = self.rel_classifier(z)
-					
-					
-					
-					
-					
-				
-				
-				
-				
 				
 				
 				
@@ -2155,6 +2386,585 @@ class BertForTokenClassification(BertPreTrainedModel):
 			elif self.relation_representation in ['STANDARD_cls_token', 'EM_cls_token']:
 				cls_token = sequence_output[:, 0, :]
 				logits = self.rel_classifier(cls_token)
+			
+			
+			
+			# loss calculation using POSITIONAL_mention_pooling_plus_context token. 11-10-2021
+			elif self.relation_representation in ['POSITIONAL_mention_pooling_plus_context']:
+
+				rel_rep_buffer_list = [] 	# relation representaion buffer per each sample
+				rel_label_buffer_list = [] 	# relation label buffer per each sample
+				total_rel_count = 0
+				
+				
+				#if self.enable_pos_emb_loss:
+				#	rel_span_buffer_list = []
+			
+				
+				for i in range(sequence_output.shape[0]): # iterate batch & collect
+					rel_list = [x for x in torch.split(relations[i], 5) if -100 not in x] # e1_span_s, e1_span_e, e2_span_s, e2_span_e, rel['rel_id']
+					#predicate_list = [x for x in torch.split(predicates[i], 2) if -100 not in x] # predicates_info
+					predicate_list = []
+					p_i = []
+					for j in predicates[i]:
+						if j.item() != -100:
+							p_i.append(j.item())
+						if j.item() == 1000000:
+							p_i.remove(1000000)
+							predicate_list.append(p_i)
+							p_i = []
+					
+					'''
+					#if len(rel_list) > 1:
+					print('relations[i]:', relations[i])
+					print('relations[i].shape:', relations[i].shape)
+					print('rel_list:', rel_list)
+					print('predicates[i]:', predicates[i])
+					print('predicate_list:', predicate_list)
+					#input('enter...')
+					'''
+					
+					# debug
+					if len(rel_list) != len(predicate_list):
+						print('relations[i]:', relations[i])
+						print('relations[i].shape:', relations[i].shape)
+						print('rel_list:', rel_list)
+						print('predicates[i]:', predicates[i])
+						print('predicate_list:', predicate_list)
+						print(len(rel_list))
+						print(len(predicate_list))
+						input('enter...')
+					
+					
+					rel_rep_buffer = [] 	# relation representaion buffer per each sample
+					rel_label_buffer = [] 	# ppi label buffer per each sample
+					
+					#if self.enable_pos_emb_loss:
+					#	rel_span_buffer = []
+					
+					for rel, predicate in zip(rel_list, predicate_list):
+						#rel = rel.tolist()
+						
+						e1_start  = rel[0]
+						e1_end    = rel[1]
+						e2_start  = rel[2]
+						e2_end    = rel[3]
+						rel_label = rel[4]
+						
+						e1_rep = sequence_output[i, e1_start:e1_end, :]
+						e2_rep = sequence_output[i, e2_start:e2_end, :]
+						
+						
+						# debug
+						'''
+						print('sequence_output:', sequence_output)
+						print('e1_rep.shape:', e1_rep.shape)
+						print('e1_rep:', e1_rep)
+						print('torch.transpose(e1_rep, 0, 1):', torch.transpose(e1_rep, 0, 1))
+						print('torch.transpose(e1_rep, 0, 1).shape:', torch.transpose(e1_rep, 0, 1).shape)
+						e1_rep_transposed = torch.transpose(e1_rep, 0, 1)
+						print('torch.max(e1_rep_transposed, dim=1):', torch.max(e1_rep_transposed, dim=1))
+						print('type(torch.max(e1_rep_transposed, dim=1)[0]):', type(torch.max(e1_rep_transposed, dim=1)[0]))
+						print('len(torch.max(e1_rep_transposed, dim=1)[0]):', len(torch.max(e1_rep_transposed, dim=1)[0]))
+						original_values   = torch.max(e1_rep, dim=0)[0].tolist()
+						transposed_values = torch.max(e1_rep_transposed, dim=1)[0].tolist()
+						print('original_values:', original_values)
+						print('transposed_values:', transposed_values)
+						print('bool(original_values == transposed_values):', bool(original_values == transposed_values))
+						print(torch.max(e1_rep, dim=1)[0])
+						print(torch.max(e1_rep, dim=1)[0].shape)
+						print(torch.mean(e1_rep, dim=1))
+						print(torch.mean(e1_rep, dim=1).shape)
+						input('enter..')
+						'''
+
+						e1_rep = torch.max(e1_rep, dim=0)[0] # max_pooling [0] -> values, [1] -> indices
+						#e1_rep = torch.mean(e1_rep, dim=1)  # mean_pooling
+						
+						e2_rep = torch.max(e2_rep, dim=0)[0] # max_pooling [0] -> values, [1] -> indices
+						#e2_rep = torch.mean(e2_rep, dim=1)  # mean_pooling
+						
+						# if entity 1 appears before entity 2 in the sentence, and there is a context between them,
+						if e1_end < e2_start:
+							context = sequence_output[i, e1_end:e2_start, :]
+						# if entity 2 appears before entity 1 in the sentence, and there is a context between them,
+						elif e2_end < e1_start:				
+							context = sequence_output[i, e2_end:e1_start, :]
+						else:
+							context = torch.zeros(1, self.hidden_size, dtype=sequence_output.dtype, device=sequence_output.device)
+						
+						context = torch.max(context, dim=0)[0] # max_pooling
+						
+						'''
+						# if entity 1 appears before entity 2 in the sentence, and there is a context between them,
+						if e1_end + 1 < e2_start:
+							context = sequence_output[i, e1_end:e2_start, :]
+							context = torch.max(context, dim=0)[0] # max_pooling
+						# if entity 2 appears before entity 1 in the sentence, and there is a context between them,
+						elif e2_end + 1 < e1_start:				
+							context = sequence_output[i, e2_end:e1_start, :]
+							context = torch.max(context, dim=0)[0] # max_pooling
+						else:
+							context = torch.zeros([self.hidden_size], dtype=sequence_output.dtype, device=sequence_output.device)
+						
+						if self.enable_predicate_span:
+							use_predicate_span = predicate[2]
+							
+							if use_predicate_span:
+								predicate_span_s, predicate_span_e = predicate[0], predicate[1]
+								
+								context_2 = sequence_output[i, predicate_span_s:predicate_span_e, :]
+								context_2 = torch.max(context_2, dim=0)[0] # max_pooling
+							else:
+								context_2 = torch.zeros([self.hidden_size], dtype=sequence_output.dtype, device=sequence_output.device)
+						'''
+
+						if self.enable_ffnn_for_rep:
+							mention_context_rep = torch.cat((e1_rep, context))
+							mention_context_rep = torch.cat((mention_context_rep, e2_rep))
+						
+							mention_context_rep_z = self.context_layer_norm(self.context_act_funct(self.context_funct_h1(mention_context_rep)))
+							mention_context_rep_z = self.dropout(mention_context_rep_z)
+							#mention_context_rep_z = self.context_layer_norm(self.context_act_funct(self.context_funct_h2(mention_context_rep_z)))
+							#mention_context_rep_z = self.dropout(mention_context_rep_z)
+							mention_context_rep_z = self.context_funct_o(mention_context_rep_z)
+							mention_context_rep_z = self.dropout(mention_context_rep_z)
+							
+
+						
+						if self.enable_predicate_span:
+							use_predicate_span = predicate[0]
+							
+							if use_predicate_span:
+								p_s_l = zip(*[iter(predicate[1:])]*2)
+								all_predicate_spans = None
+								for predicate_span_s, predicate_span_e in p_s_l:
+									predicate_span_s = torch.tensor(predicate_span_s, dtype=torch.int, device=sequence_output.device)
+									predicate_span_e = torch.tensor(predicate_span_e, dtype=torch.int, device=sequence_output.device)
+									
+									predicate_span = sequence_output[i, predicate_span_s:predicate_span_e, :]
+									
+									'''
+									print(context)
+									print(predicate_span)
+									print(context.shape)
+									print(predicate_span.shape)
+									print(e1_start, e1_end, e2_start, e2_end)
+									print(predicate_span_s, predicate_span_e)
+									#input('enter..')
+									'''
+									if all_predicate_spans is None:
+										all_predicate_spans = predicate_span
+									else:
+										all_predicate_spans = torch.cat((all_predicate_spans, predicate_span))
+									
+									del predicate_span
+									
+									
+									
+								
+								
+								predicate_outputs = self.predicate_attention(
+														hidden_states,
+														attention_mask,
+														head_mask,
+														encoder_hidden_states,
+														encoder_attention_mask,
+														past_key_value,
+														output_attentions,
+													)
+									
+									
+									
+									
+									
+									
+									
+									
+									
+								predicate_span = torch.max(all_predicate_spans, dim=0)[0] # max_pooling
+								del all_predicate_spans
+							else:
+								predicate_span = torch.zeros([self.hidden_size], dtype=sequence_output.dtype, device=sequence_output.device)
+
+							if self.enable_ffnn_for_rep:
+								mention_predicate_rep = torch.cat((e1_rep, predicate_span))
+								mention_predicate_rep = torch.cat((mention_predicate_rep, e2_rep))
+							
+								mention_predicate_rep_z = self.predicate_layer_norm(self.predicate_act_funct(self.predicate_funct_h1(mention_predicate_rep)))
+								mention_predicate_rep_z = self.dropout(mention_predicate_rep_z)
+								#mention_predicate_rep_z = self.predicate_layer_norm(self.predicate_act_funct(self.predicate_funct_h2(mention_predicate_rep_z)))
+								#mention_predicate_rep_z = self.dropout(mention_predicate_rep_z)
+								mention_predicate_rep_z = self.predicate_funct_o(mention_predicate_rep_z)
+								mention_predicate_rep_z = self.dropout(mention_predicate_rep_z)
+								
+						# using span positional embeds.
+						'''
+						input_tokens = self.tokenizer.convert_ids_to_tokens(input_ids[i])
+						
+						print(input_tokens)
+						
+						print(e1_start)
+						print(e1_end)
+						print(e2_start)
+						print(e2_end)
+						input('enter..')
+						'''
+						
+						#cls_token = sequence_output[i, 0, :]
+						
+						
+						'''
+						#e_span_rep = torch.cat((e1_rep, e2_rep))
+						#e_span_rep = torch.cat((e1_span_s_pos_embed, e1_rep))
+						#e_span_rep = torch.cat((e_span_rep, e1_span_e_pos_embed))
+						e_span_rep = torch.cat((e1_rep, context))
+						
+						
+						#if self.enable_predicate_span:
+						#	e_span_rep = torch.cat((e_span_rep, context_2))
+						
+						
+						#e_span_rep = torch.cat((e_span_rep, e2_span_s_pos_embed))
+						e_span_rep = torch.cat((e_span_rep, e2_rep))
+						#e_span_rep = torch.cat((e_span_rep, e2_span_e_pos_embed))
+						'''
+						
+						if self.enable_pos_emb_loss:
+							e1_span_s_pos_embed = self.bert.embeddings.position_embeddings(e1_start-1)
+							e1_span_e_pos_embed = self.bert.embeddings.position_embeddings(e1_end)
+							e2_span_s_pos_embed = self.bert.embeddings.position_embeddings(e2_start-1)
+							e2_span_e_pos_embed = self.bert.embeddings.position_embeddings(e2_end)
+							
+							pos_emb_rep = torch.cat((e1_span_s_pos_embed, e2_span_s_pos_embed))
+							#pos_emb_rep = torch.cat((pos_emb_rep, e2_span_s_pos_embed))
+							#pos_emb_rep = torch.cat((pos_emb_rep, e2_span_e_pos_embed))
+							
+							
+							
+							
+							
+							
+							#pos_diff_embed = self.pos_diff_embeddings(abs(e2_start - e1_start))
+
+							pos_diff_embed = self.pos_diff_embeddings(abs(torch.round((e1_start + e1_end)/2 - (e2_start + e2_end)/2).long()))
+							
+							
+							pos_emb_rep = torch.cat((pos_emb_rep, pos_diff_embed))
+							
+
+							
+							
+							
+							
+							if self.enable_ffnn_for_rep:
+								pos_emb_rep_z = self.pos_emb_layer_norm(self.pos_emb_act_funct(self.pos_emb_funct_h1(pos_emb_rep)))
+								pos_emb_rep_z = self.dropout(pos_emb_rep_z)
+								#pos_emb_rep_z = self.pos_emb_layer_norm(self.pos_emb_act_funct(self.pos_emb_funct_h2(pos_emb_rep_z)))
+								#pos_emb_rep_z = self.dropout(pos_emb_rep_z)
+								pos_emb_rep_z = self.pos_emb_funct_o(pos_emb_rep_z)
+								pos_emb_rep_z = self.dropout(pos_emb_rep_z)
+								
+								#e_span_rep = torch.cat((e_span_rep, z))
+								
+								
+
+						
+						
+						'''
+						print(e1_rep.shape)
+						print(e_span_rep.shape)
+						print(labels.shape)
+						input('enter..')
+						'''
+						if self.enable_ffnn_for_rep:
+							if self.enable_predicate_span and self.enable_pos_emb_loss:
+								final_rep = torch.cat((mention_context_rep_z, mention_predicate_rep_z))
+								final_rep = torch.cat((final_rep, pos_emb_rep_z))
+								#final_rep = torch.cat((e1_rep, context))
+								#final_rep = torch.cat((final_rep, e2_rep))
+								#final_rep = torch.cat((final_rep, mention_predicate_rep_z))
+								#final_rep = torch.cat((final_rep, pos_emb_rep_z))
+							elif self.enable_predicate_span:
+								final_rep = torch.cat((mention_context_rep_z, mention_predicate_rep_z))
+							elif self.enable_pos_emb_loss:
+								final_rep = torch.cat((mention_context_rep_z, pos_emb_rep_z))
+							else:
+								final_rep = torch.cat((e1_rep, context))
+								final_rep = torch.cat((final_rep, e2_rep))
+						else:
+							
+							if self.enable_predicate_span:
+								context = torch.stack((context, predicate_span))
+								context = torch.max(context, dim=0)[0] # max_pooling
+							
+							final_rep = torch.cat((e1_rep, context))
+							final_rep = torch.cat((final_rep, e2_rep))
+							
+							
+							'''
+							e1_span_width_embed = self.span_width_embeddings(abs(e1_end - e1_start))
+							e2_span_width_embed = self.span_width_embeddings(abs(e2_end - e2_start))
+							
+							final_rep = torch.cat((e1_rep, e1_span_width_embed))
+							final_rep = torch.cat((final_rep, context))
+							final_rep = torch.cat((final_rep, e2_rep))
+							final_rep = torch.cat((final_rep, e2_span_width_embed))
+							'''
+
+
+
+							if self.enable_pos_emb_loss:
+								#final_rep = torch.cat((final_rep, pos_emb_rep))
+								final_rep = torch.cat((final_rep, pos_diff_embed))
+							
+							
+							
+								
+							
+						'''
+						print(e1_rep.shape)
+						print(context.shape)
+						print(e2_rep.shape)
+						print(pos_emb_rep_z.shape)
+						print(final_rep.shape)
+						print(labels.shape)
+						input('enter..')
+						'''
+						
+						
+						
+						
+						rel_rep_buffer.append(final_rep)
+						rel_label_buffer.append(rel_label)
+						
+						
+						#if self.enable_pos_emb_loss:
+						#	rel_span_buffer.append(e_span_rep_2)
+
+						
+						
+
+						del e1_rep
+						del e2_rep
+						del context
+						if self.enable_predicate_span:
+							del predicate_span
+						if self.enable_pos_emb_loss:
+							del e1_span_s_pos_embed
+							del e2_span_s_pos_embed
+						#del e_span_rep
+						
+						#if self.enable_pos_emb_loss:
+						#	del e_span_rep_2
+
+					rel_rep_buffer_list.append(rel_rep_buffer)
+					rel_label_buffer_list.append(rel_label_buffer)
+					
+					
+					#if self.enable_pos_emb_loss:
+					#	rel_span_buffer_list.append(rel_span_buffer)
+					
+					
+					
+					total_rel_count += len(rel_rep_buffer)
+					
+					if len(rel_rep_buffer) != len(rel_label_buffer): # debug
+						raise ValueError(
+							"The representation size (%d) and the label size (%d) are not the same." % (config.hidden_size, config.num_attention_heads)
+						)
+				
+				
+				
+				# the ppi_relations are padded in datacollator, so the size should be the same as the other samples running on diffenent gpus.
+				#max_length = len([x for x in torch.split(ppi_relations[0], 5)])
+				
+				
+				'''
+				for r_l in rel_rep_buffer_list:
+					print(len(r_l))
+				print('len(max(rel_rep_buffer_list, key=len)):', len(max(rel_rep_buffer_list, key=len)))
+				print('max_length:', max_length)
+				input('enter...')
+				'''
+				
+				#max_length = len(max(rel_rep_buffer_list, key=len))
+				#max_length = 3000
+				max_length = labels.size(dim=1)			
+				pad_token = None
+				for i in rel_rep_buffer_list:
+					for j in i:
+						pad_token = torch.zeros_like(j)
+						break
+					if pad_token is not None:
+						break
+				rel_rep_buffer_list_padded = [x + [pad_token]*(max_length - len(x)) for x in rel_rep_buffer_list]
+				rel_label_buffer_list_padded = [x + [-100]*(max_length - len(x)) for x in rel_label_buffer_list]
+
+				'''
+				if self.enable_pos_emb_loss:
+					pad_token_2 = None
+					for i in rel_span_buffer_list:
+						for j in i:
+							pad_token_2 = torch.zeros_like(j)
+							break
+						if pad_token_2 is not None:
+							break
+							
+					rel_span_buffer_list_padded = [x + [pad_token_2]*(max_length - len(x)) for x in rel_span_buffer_list]
+				'''
+				
+				
+				'''
+				print(rel_rep_buffer_list)
+				print(rel_label_buffer_list)
+				print(rel_rep_buffer_list_padded)
+				print(rel_label_buffer_list_padded)
+				'''
+
+				#rel_rep = torch.stack([a for a in rel_rep_buffer], dim=0)
+
+				
+				# TODO: add paddings when 'i' is empty. 
+				# -> No, it's not necessary. It shouldn't be empty, and if the protein entity combination is not found by NER, then assign a garbage tensor like a zero tensor.
+				#    Actually, it's already padded above.
+				l = []
+				for i in rel_rep_buffer_list_padded:
+					l.append(torch.stack([x for x in i], dim=0))
+				
+				rel_rep = torch.stack([x for x in l], dim=0)
+				
+				del rel_rep_buffer_list
+				del rel_rep_buffer_list_padded
+				
+				'''
+				if self.enable_pos_emb_loss:
+					l_2 = []
+					for i in rel_span_buffer_list_padded:
+						l_2.append(torch.stack([x for x in i], dim=0))
+					
+					rel_span = torch.stack([x for x in l_2], dim=0)
+					
+					
+					del rel_span_buffer_list
+					del rel_span_buffer_list_padded
+				'''
+				
+				
+				'''
+				z = self.LayerNorm(self.rep_act_funct(self.rep_funct_h1(rel_rep)))
+				z = self.dropout(z)
+				z = self.LayerNorm(self.rep_act_funct(self.rep_funct_h2(z)))
+				z = self.dropout(z)
+				z = self.rep_funct_o(z)
+				z = self.dropout(z)
+				'''
+				
+				
+				ppi_labels = torch.tensor(rel_label_buffer_list_padded, dtype=torch.long, device=relations.device)
+				del rel_label_buffer_list_padded
+
+				rel_loss_fct = CrossEntropyLoss()
+				
+				if self.enable_mention_pooling_and_context:
+					
+					logits = self.rel_classifier(rel_rep)
+
+					active_loss = ppi_labels.view(-1) != -100
+					active_logits = logits.view(-1, self.num_ppi_labels)
+					active_labels = torch.where(
+						active_loss, ppi_labels.view(-1), torch.tensor(rel_loss_fct.ignore_index).type_as(ppi_labels)
+					)
+
+					mention_and_context_loss = rel_loss_fct(active_logits, active_labels)
+					
+
+					''' Test code for one class classification for ADE data. Not working... 11-12-2021
+					print(loss)
+					print(loss.shape)
+					input('enter..')
+					
+					#print(rel_rep)
+					#print(rel_rep.shape)
+					#print(logits.shape)
+					print('active_logits:', active_logits)
+					print('active_logits.shape:', active_logits.shape)
+					print('active_logits.squeeze():', active_logits.squeeze())
+					print('active_logits.squeeze().shape:', active_logits.squeeze().shape)
+					print('ppi_labels:', ppi_labels)
+					print('ppi_labels.shape:', ppi_labels.shape)
+					#print(active_labels)
+					#print(active_labels.shape)
+					print('active_loss:', active_loss)
+					print('active_loss.shape:', active_loss.shape)
+					
+					b = active_loss == True
+					indices = b.nonzero()
+					#print(b)
+					#print(indices.view(-1))
+					
+					
+					#active_logits = active_logits.squeeze()
+					print('active_logits:', active_logits)
+					active_logits = torch.index_select(active_logits, 0, indices.view(-1))
+					print('active_logits:', active_logits)
+					print('active_logits.shape:', active_logits.shape)
+					
+					active_labels = torch.index_select(ppi_labels.view(-1), 0, indices.view(-1))
+					#active_labels = ppi_labels.view(-1)
+					print('active_labels:', active_labels)
+					print('active_labels.shape:', active_labels.shape)
+		
+					
+					active_logits = active_logits.float()
+					active_labels = active_labels.float()
+					
+					rel_loss_fct = BCEWithLogitsLoss()
+					loss = rel_loss_fct(active_logits, active_labels)
+					
+					print(loss)
+					print(loss.shape)
+					input('enter..')
+					'''
+
+				"""
+				if self.enable_pos_emb_loss:
+					span_logits = self.span_classifier(rel_span)
+					
+					active_loss = ppi_labels.view(-1) != -100
+					active_logits = span_logits.view(-1, self.num_ppi_labels)
+					active_labels = torch.where(
+						active_loss, ppi_labels.view(-1), torch.tensor(rel_loss_fct.ignore_index).type_as(ppi_labels)
+					)
+					
+					span_loss = rel_loss_fct(active_logits, active_labels)
+					
+					
+					''' Test code for one class classification for ADE data. Not working... 11-12-2021
+					b = active_loss == True
+					indices = b.nonzero()
+					
+					active_logits = active_logits.squeeze()
+					active_logits = torch.index_select(active_logits, 0, indices.view(-1))
+					active_labels = torch.index_select(ppi_labels.view(-1), 0, indices.view(-1))
+		
+					active_logits = active_logits.float()
+					active_labels = active_labels.float()
+					
+					rel_loss_fct = BCEWithLogitsLoss()
+					span_loss = rel_loss_fct(active_logits, active_labels)
+					'''
+				"""	
+				if self.enable_mention_pooling_and_context:
+					loss = mention_and_context_loss
+				"""
+				if self.enable_pos_emb_loss:
+					if self.enable_mention_pooling_and_context:
+						loss += span_loss
+					else:
+						loss = span_loss
+						logits = span_logits
+				"""		
 			
 			'''
 			elif self.relation_representation == 'Multiple_Relations':
@@ -2198,42 +3008,48 @@ class BertForTokenClassification(BertPreTrainedModel):
 				input('enter..')
 
 				logits = self.rel_classifier(rel_rep)
-			'''		
-
-			loss_fct = CrossEntropyLoss()
-			
-			#if self.relation_representation == 'Multiple_Relations':
-			#	loss = loss_fct(logits, ppi_label)
-			#else:
-			loss = loss_fct(logits, labels.squeeze(1)[:,0]) # without paddings
-			
-			#loss = loss*self.ppi_weight
-			
-			#loss = loss/args.gradient_acc_steps
-			
-			# debug
 			'''	
-			for i in input_ids:
-				print('input_ids:', i)
-			for i in sequence_output:
-				print('sequence_output:', i)
-			print('e1_e2_start:', e1_e2_start)
-			print('v1v2:', v1v2)
-			print('v1v2.shape:', v1v2.shape)
-			print('type(input_ids):', type(input_ids))
-			print('input_ids.shape:', input_ids.shape)
-			print('type(e1_e2_start):', type(e1_e2_start))
-			print('e1_e2_start.shape:', e1_e2_start.shape)
-			print('type(sequence_output):', type(sequence_output))
-			print('sequence_output.shape:', sequence_output.shape)
-			print('logits.shape:', logits.shape)
-			print('logits:', logits)
-			#print('labels.squeeze(1).shape:', labels.squeeze(1).shape)
-			#print('labels.squeeze(1):', labels.squeeze(1))
-			#print('labels.squeeze(1)[:,0].shape:', labels.squeeze(1)[:,0].shape)
-			#print('labels.squeeze(1)[:,0]:', labels.squeeze(1)[:,0])
-			input('enter..')
-			'''
+			
+			
+			
+			
+			# TODO: make it cleaner later.
+			if not self.relation_representation in ['POSITIONAL_mention_pooling_plus_context']:
+
+				loss_fct = CrossEntropyLoss()
+				
+				#if self.relation_representation == 'Multiple_Relations':
+				#	loss = loss_fct(logits, ppi_label)
+				#else:
+				loss = loss_fct(logits, labels.squeeze(1)[:,0]) # without paddings
+				
+				#loss = loss*self.ppi_weight
+				
+				#loss = loss/args.gradient_acc_steps
+				
+				# debug
+				'''	
+				for i in input_ids:
+					print('input_ids:', i)
+				for i in sequence_output:
+					print('sequence_output:', i)
+				print('e1_e2_start:', e1_e2_start)
+				print('v1v2:', v1v2)
+				print('v1v2.shape:', v1v2.shape)
+				print('type(input_ids):', type(input_ids))
+				print('input_ids.shape:', input_ids.shape)
+				print('type(e1_e2_start):', type(e1_e2_start))
+				print('e1_e2_start.shape:', e1_e2_start.shape)
+				print('type(sequence_output):', type(sequence_output))
+				print('sequence_output.shape:', sequence_output.shape)
+				print('logits.shape:', logits.shape)
+				print('logits:', logits)
+				#print('labels.squeeze(1).shape:', labels.squeeze(1).shape)
+				#print('labels.squeeze(1):', labels.squeeze(1))
+				#print('labels.squeeze(1)[:,0].shape:', labels.squeeze(1)[:,0].shape)
+				#print('labels.squeeze(1)[:,0]:', labels.squeeze(1)[:,0])
+				input('enter..')
+				'''
 		# [GP][END] - loss calculation for PPI task. 04-04-2021
 		
 		elif self.finetuning_task == 'joint-ner-ppi':
