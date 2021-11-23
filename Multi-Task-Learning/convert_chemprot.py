@@ -413,6 +413,7 @@ for filename in os.listdir(data_dir):
 		use_predicate_span = False
 			
 		if predicate_exists_between_entities == False:
+		#if True:
 			num_of_found_predicates = 0 # debug
 			
 			for v in verbs:
@@ -458,8 +459,10 @@ for filename in os.listdir(data_dir):
 					predicate_end_idx = max(v['verb_idx']) + 1
 					
 					if e1_start < e2_start: # e1 appears before e2 
-						if not ((predicate_start_idx >= e1_end and predicate_start_idx < e2_start) and \
-								(predicate_end_idx > e1_end and predicate_end_idx <= e2_start)):
+						''' [predicate] [e1] ... [e2] or [e1] ... [e2] [predicate] '''
+						if predicate_end_idx <= e1_start or predicate_start_idx >= e2_end:
+							#if not ((predicate_start_idx >= e1_end and predicate_start_idx < e2_start) and \
+							#		(predicate_end_idx > e1_end and predicate_end_idx <= e2_start)):
 							use_predicate_span = True
 							num_of_predicates_for_samples_with_no_context_between_entities += 1
 							
@@ -468,8 +471,10 @@ for filename in os.listdir(data_dir):
 							predicates.append(predicate)
 							predicates_idx.append((predicate_start_idx, predicate_end_idx))
 					elif e1_start > e2_start: # e2 appears before e1
-						if not ((predicate_start_idx >= e2_end and predicate_start_idx < e1_start) and \
-								(predicate_end_idx > e2_end and predicate_end_idx <= e1_start)):
+						''' [predicate] [e2] ... [e1] or [e2] ... [e1] [predicate] '''
+						if predicate_end_idx <= e2_start or predicate_start_idx >= e1_end:
+							#if not ((predicate_start_idx >= e2_end and predicate_start_idx < e1_start) and \
+							#		(predicate_end_idx > e2_end and predicate_end_idx <= e1_start)):
 							use_predicate_span = True
 							num_of_predicates_for_samples_with_no_context_between_entities += 1
 							

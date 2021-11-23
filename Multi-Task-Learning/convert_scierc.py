@@ -247,9 +247,11 @@ for file in os.listdir(data_dir):
 					children_indice.append(child.i)
 					children_tokens.append(child.text)
 					
+					
 					if child.dep_ == 'aux' or child.dep_ == 'auxpass' or child.dep_ == 'neg':
 						v['verb_idx'].append(child.i)
 						v['verb_token'][child.i] = child.text
+					
 						
 				v['children_indice'] = children_indice
 				v['children_tokens'] = children_tokens
@@ -326,7 +328,8 @@ for file in os.listdir(data_dir):
 			
 			use_predicate_span = False
 			
-			if predicate_exists_between_entities == False:
+			#if predicate_exists_between_entities == False:
+			if True:
 				num_of_found_predicates = 0 # debug
 				
 				for v in verbs:
