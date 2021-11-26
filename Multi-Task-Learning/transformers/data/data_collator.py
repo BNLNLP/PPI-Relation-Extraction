@@ -296,8 +296,24 @@ class DataCollatorForTokenClassification(DataCollatorMixin):
 		
 		# [START][GP] - padding 'ppi_relations' for joint-ner-ppi approach
 		if "ppi_relations" in batch:
-			rel_max_length = max(map(len, batch["ppi_relations"]))
+			ppi_rel_max_length = max(map(len, batch["ppi_relations"]))
 		# [END][GP] - padding 'ppi_relations' for joint-ner-ppi approach
+		
+		# [START][GP] - padding 'relations' for relation classification
+		if "relations" in batch:
+			rel_max_length = max(map(len, batch["relations"]))
+		# [END][GP] - padding 'relations' for relation classification
+		
+		# [START][GP] - padding 'predicates' for relation classification. 11-14-2021
+		if "predicates" in batch:
+			predicate_max_length = max(map(len, batch["predicates"]))
+		# [END][GP] - padding 'predicates' for relation classification 11-14-2021
+		
+		# [START][GP] - padding 'entity_types' for relation classification. 11-23-2021
+		if "entity_types" in batch:
+			entity_types_max_length = max(map(len, batch["entity_types"]))
+		# [END][GP] - padding 'entity_types' for relation classification 11-23-2021
+		
 		
 		
 		padding_side = self.tokenizer.padding_side
@@ -309,8 +325,24 @@ class DataCollatorForTokenClassification(DataCollatorMixin):
 
 			# [START][GP] - padding 'ppi_relations' for joint-ner-ppi approach
 			if "ppi_relations" in batch:
-				batch["ppi_relations"] = [ppi_relation + [self.label_pad_token_id] * (rel_max_length - len(ppi_relation)) for ppi_relation in batch["ppi_relations"]]
+				batch["ppi_relations"] = [ppi_relation + [self.label_pad_token_id] * (ppi_rel_max_length - len(ppi_relation)) for ppi_relation in batch["ppi_relations"]]
 			# [END][GP] - padding 'ppi_relations' for joint-ner-ppi approach
+			
+			
+			# [START][GP] - padding 'relations' for relation classification
+			if "relations" in batch:
+				batch["relations"] = [relation + [self.label_pad_token_id] * (rel_max_length - len(relation)) for relation in batch["relations"]]
+			# [END][GP] - padding 'relations' for relation classification
+			
+			# [START][GP] - padding 'predicates' for relation classification. 11-14-2021
+			if "predicates" in batch:
+				batch["predicates"] = [predicate + [self.label_pad_token_id] * (predicate_max_length - len(predicate)) for predicate in batch["predicates"]]
+			# [END][GP] - padding 'predicates' for relation classification 11-14-2021
+			
+			# [START][GP] - padding 'entity_types' for relation classification. 11-14-2021
+			if "entity_types" in batch:
+				batch["entity_types"] = [entity_type + [self.label_pad_token_id] * (entity_types_max_length - len(entity_type)) for entity_type in batch["entity_types"]]
+			# [END][GP] - padding 'entity_types' for relation classification 11-14-2021
 			
 			
 			

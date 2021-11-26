@@ -13,6 +13,71 @@ import json
 import spacy
 from spacy.tokens import Doc
 
+
+
+
+
+# read entity types.
+entity_files = ['datasets/chemprot/ChemProt_Corpus/chemprot_training/chemprot_training_entities.tsv',
+				'datasets/chemprot/ChemProt_Corpus/chemprot_test_gs/chemprot_test_entities_gs.tsv',
+				'datasets/chemprot/ChemProt_Corpus/chemprot_development/chemprot_development_entities.tsv']
+
+entity_type_dict = {}
+
+for filepath in entity_files:
+	f = open(filepath)
+	
+	read_tsv = csv.reader(f, delimiter="\t")
+
+	for row in read_tsv:
+		#print(row)
+		#input('enter..')
+		e_type = row[2]
+		e_name = row[5]
+		
+		if e_name in entity_type_dict:
+			"""
+			Some entities have different types. I'm not sure if it's an error. In this case, just the most common type.
+			e.g., Nrf2 (GENE-Y, GENE-N), matriptase-2 (GENE-Y, GENE-N), EROD (CHEMICAL, GENE-N)
+			"""
+			if e_type in entity_type_dict[e_name]:
+				entity_type_dict[e_name][e_type] += 1
+			else:
+				entity_type_dict[e_name][e_type] = 1
+			'''
+			if entity_type_dict[e_name] != e_type:
+				print('Error!! - Different type for the same entity.')
+				print(e_name, entity_type_dict[e_name], e_type)
+				input('enter...')
+			'''		
+		else:
+			entity_type_dict[e_name] = {e_type: 1}
+
+import operator
+
+for k, v in entity_type_dict.items():
+	if len(v) == 1:
+		entity_type_dict[k] = list(v.keys())[0]
+	else:
+		entity_type_dict[k] = max(v.items(), key=operator.itemgetter(1))[0]
+		# debug
+		'''
+		for kk, vv in v.items():
+			print(k, kk, vv)
+		print(max(v.items(), key=operator.itemgetter(1))[0])
+		input('enter..')
+		'''
+		
+
+
+
+
+
+
+
+
+
+
 nlp = spacy.load('en_core_web_sm')
 
 
@@ -166,6 +231,35 @@ for filename in os.listdir(data_dir):
 			print('Error: UNKNOWN relation type - ', rel_type)
 			input('enter...')
 		
+		
+		'''
+		from: BioCreative VI ** Text mining chemical-­‐protein interactions (CHEMPROT) track
+		
+		Important: For evaluation purposes only five groups labeled with ‘Y’ will be used, that is: CPR:3, CPR:4, CPR:5, CPR:6, CPR:9.
+		
+		CPR:3	UPREGULATOR|ACTIVATOR|INDIRECT_UPREGULATOR
+		CPR:4	DOWNREGULATOR|INHIBITOR|INDIRECT_DOWNREGULATOR
+		CPR:5	AGONIST|AGONIST-­‐ACTIVATOR|AGONIST-­‐INHIBITOR
+		CPR:6	ANTAGONIST
+		CPR:9	SUBSTRATE|PRODUCT_OF|SUBSTRATE_PRODUCT_OF
+		'''
+		if rel_type in ['UPREGULATOR', 'ACTIVATOR', 'INDIRECT-UPREGULATOR']:
+			rel_type = 'CPR-3'
+			rel_id = 0
+		elif rel_type in ['DOWNREGULATOR', 'INHIBITOR', 'INDIRECT-DOWNREGULATOR']:
+			rel_type = 'CPR-4'
+			rel_id = 1
+		elif rel_type in ['AGONIST', 'AGONIST-ACTIVATOR', 'AGONIST-INHIBITOR']:
+			rel_type = 'CPR-5'
+			rel_id = 2 
+		elif rel_type in ['ANTAGONIST']:
+			rel_type = 'CPR-6'
+			rel_id = 3 
+		elif rel_type in ['SUBSTRATE', 'PRODUCT-OF', 'SUBSTRATE_PRODUCT-OF']:
+			rel_type = 'CPR-9'
+			rel_id = 4
+
+		'''
 		if rel_type == 'AGONIST-ACTIVATOR':
 			rel_id = 0
 		elif rel_type == 'DOWNREGULATOR':
@@ -192,9 +286,10 @@ for filename in os.listdir(data_dir):
 			rel_id = 11
 		elif rel_type == 'UPREGULATOR':
 			rel_id = 12
+		'''
 		
 		
-		
+				
 		
 		
 		
@@ -510,12 +605,22 @@ for filename in os.listdir(data_dir):
 		
 		total_num_of_samples += 1
 		
+		# debug
+		if entity_1 not in entity_type_dict:
+			print('Error!! entity_1 is not in entity_type_dict:', entity_1)
+			input('enter...')
+		if entity_2 not in entity_type_dict:
+			print('Error!! entity_2 is not in entity_type_dict:', entity_2)
+			input('enter...')
+		
 		relation = {'rel_id': rel_id, 
 					'rel_type': rel_type, 
 					'entity_1': entity_1,
 					'entity_1_idx': (e1_start, e1_end),
+					'entity_1_type': entity_type_dict[entity_1],
 					'entity_2': entity_2,
 					'entity_2_idx': (e2_start, e2_end),
+					'entity_2_type': entity_type_dict[entity_2],
 					'use_predicate_span': use_predicate_span,
 					'predicates': predicates,
 					'predicates_idx': predicates_idx}

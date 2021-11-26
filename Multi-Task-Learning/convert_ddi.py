@@ -16,6 +16,92 @@ import json
 import spacy
 from spacy.tokens import Doc
 
+
+
+
+# read entity types.
+ddi_corpus_dir = 'datasets/ddi/bluebert/DDICorpusBrat/'
+
+entity_type_dict = {}
+
+num_of_splitted_entities = 0 # debug
+
+for root, dirs, files in os.walk(ddi_corpus_dir):
+	for file in files:
+		
+		# debug
+		'''
+		if file.endswith(".txt"):
+			f = open(os.path.join(root, file))
+			for line in f.readlines():
+				if 'The objective of this study was to evaluate' in line:
+					print(os.path.join(root, file))
+					input('enter..')
+		'''
+		
+		if file.endswith(".ann"): 
+			
+			f = open(os.path.join(root, file))
+			
+			for line in f.readlines():
+				#print(line)
+				#print(line.split('\t'))
+				#input('enter..')
+				
+				if line.startswith('R'): # skip relations.
+					continue
+
+				line = line.split('\t')
+				e_type = line[1].split()[0].strip()
+				e_name = line[2].strip()
+				
+				
+				# debug
+				#if file == '21844260.ann':
+				if ';' in line[1]:
+					print(line)
+					print(e_type, e_name)
+					num_of_splitted_entities += 1
+					#input('enter..')
+				
+				
+				
+				
+				if e_name in entity_type_dict:
+					"""
+					Some entities have different types. I'm not sure if it's an error. In this case, just the most common type.
+					e.g., Nrf2 (GENE-Y, GENE-N), matriptase-2 (GENE-Y, GENE-N), EROD (CHEMICAL, GENE-N)
+					"""
+					if e_type in entity_type_dict[e_name]:
+						entity_type_dict[e_name][e_type] += 1
+					else:
+						entity_type_dict[e_name][e_type] = 1
+					'''
+					if entity_type_dict[e_name] != e_type:
+						print('Error!! - Different type for the same entity.')
+						print(e_name, entity_type_dict[e_name], e_type)
+						input('enter...')
+					'''		
+				else:
+					entity_type_dict[e_name] = {e_type: 1}
+
+import operator
+
+for k, v in entity_type_dict.items():
+	if len(v) == 1:
+		entity_type_dict[k] = list(v.keys())[0]
+	else:
+		entity_type_dict[k] = max(v.items(), key=operator.itemgetter(1))[0]
+		# debug
+		'''
+		for kk, vv in v.items():
+			print(k, kk, vv)
+		print(max(v.items(), key=operator.itemgetter(1))[0])
+		input('enter..')
+		'''
+
+
+
 nlp = spacy.load('en_core_web_sm')
 
 
@@ -30,7 +116,7 @@ num_of_samples_with_no_predicate_in_context = 0 # count the number of sentences 
 num_of_samples_with_entity_in_predicate = 0 # count the number of sentences where predicate contains entity because of parsing error.
 num_of_predicates_for_samples_with_no_context_between_entities = 0 # count the samples where a predicate having either entity as child exists for samples that no verb exists between the two entities.
 num_of_samples_with_error_tags = 0 # count the number of samples where tag error exists such as more than two ' >>'.
-
+num_of_sample_with_split_entities = 0 # count the number smaple having entities composed of separate tokens other than a single span. e.g., T5	DRUG 422 436;444 452	inactivated ND vaccines (from Test/MedLine/21844260.ann)
 
 
 for filename in os.listdir(data_dir):
@@ -444,8 +530,8 @@ for filename in os.listdir(data_dir):
 		
 		use_predicate_span = False
 			
-		#if predicate_exists_between_entities == False:
-		if True:
+		if predicate_exists_between_entities == False:
+		#if True:
 			num_of_found_predicates = 0 # debug
 			
 			for v in verbs:
@@ -537,19 +623,70 @@ for filename in os.listdir(data_dir):
 			#input('enter..')
 		'''
 		
+		
+		
+		# debug
+		is_entity_split = False
+		if entity_1 not in entity_type_dict:
+			found = False
+			for k in entity_type_dict.keys():
+				if entity_1 in k:
+					e1_type = entity_type_dict[k]
+					found = True
+					'''
+					print('k in entity:', k)
+					print('entity_type_dict[k]:', entity_type_dict[k])
+					input('enter..')
+					'''
+					break
+			
+			if found:
+				entity_type_dict[entity_1] = e1_type
+			else:
+				print('Error!! entity_1 is not in entity_type_dict:', entity_1)
+				print('text:', row[0])
+				is_entity_split = True
+				#input('enter...')
+		
+		if entity_2 not in entity_type_dict:
+			found = False
+			for k in entity_type_dict.keys():
+				if entity_2 in k:
+					e2_type = entity_type_dict[k]
+					found = True
+					'''
+					print('k in entity:', k)
+					print('entity_type_dict[k]:', entity_type_dict[k])
+					input('enter..')
+					'''
+					break
+			
+			if found:
+				entity_type_dict[entity_2] = e2_type
+			else:
+				print('Error!! entity_2 is not in entity_type_dict:', entity_2)
+				print('text:', row[0])
+				is_entity_split = True
+				#input('enter...')
+			
+		if is_entity_split: # skip samples with a split entity.
+			num_of_sample_with_split_entities += 1
+			continue
+		
 		total_num_of_samples += 1
-
+		
 		relation = {'rel_id': rel_id, 
 					'rel_type': rel_type, 
 					'entity_1': entity_1,
 					'entity_1_idx': (e1_start, e1_end),
+					'entity_1_type': entity_type_dict[entity_1],
 					'entity_2': entity_2,
 					'entity_2_idx': (e2_start, e2_end),
+					'entity_2_type': entity_type_dict[entity_2],
 					'use_predicate_span': use_predicate_span,
 					'predicates': predicates,
 					'predicates_idx': predicates_idx}
-
-		
+					
 		output_txt += json.dumps({"id": None, # TODO: put any unique id although it's not used.
 								  "tokens": tokens,
 								  "relation": [relation],
@@ -572,6 +709,9 @@ print('>> num_of_samples_with_no_context_between_entities:', num_of_samples_with
 print('>> num_of_samples_with_no_predicate_in_context:', num_of_samples_with_no_predicate_in_context)
 print('>> num_of_samples_with_entity_in_predicate:', num_of_samples_with_entity_in_predicate)
 print('>> num_of_predicates_for_samples_with_no_context_between_entities:', num_of_predicates_for_samples_with_no_context_between_entities)
+print('>> num_of_splitted_entities:', num_of_splitted_entities)
+print('>> num_of_sample_with_split_entities:', num_of_sample_with_split_entities)
+
 
 
 """ deprecated: old way of conversion using 'entity_marked_sent'

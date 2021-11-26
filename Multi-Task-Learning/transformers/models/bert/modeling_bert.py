@@ -250,7 +250,24 @@ class BertSelfAttention(nn.Module):
 
 	def transpose_for_scores(self, x):
 		new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+		
+		'''
+		print('<class BertSelfAttention> transpose_for_scores() x.size()[:-1]:', x.size()[:-1])
+		print('<class BertSelfAttention> transpose_for_scores() new_x_shape:', new_x_shape)
+		print('<class BertSelfAttention> transpose_for_scores() x.view(*new_x_shape).shape:', x.view(*new_x_shape).shape)
+		'''
+		
+		
 		x = x.view(*new_x_shape)
+		
+		
+		'''
+		print('<class BertSelfAttention> transpose_for_scores() x.permute(0, 2, 1, 3).shape:', x.permute(0, 2, 1, 3).shape)
+		'''
+		
+		
+		
+		
 		return x.permute(0, 2, 1, 3)
 
 	def forward(
@@ -263,6 +280,13 @@ class BertSelfAttention(nn.Module):
 		past_key_value=None,
 		output_attentions=False,
 	):
+	
+	
+	
+		#print('<class BertSelfAttention> hidden_states.shape:', hidden_states.shape)
+	
+	
+	
 		mixed_query_layer = self.query(hidden_states)
 
 		# If this is instantiated as a cross-attention module, the keys
@@ -336,6 +360,32 @@ class BertSelfAttention(nn.Module):
 			attention_probs = attention_probs * head_mask
 
 		context_layer = torch.matmul(attention_probs, value_layer)
+		
+		
+				
+		
+		
+		
+		'''
+		print('<class BertSelfAttention> query_layer.shape:', query_layer.shape)
+		print('<class BertSelfAttention> key_layer.shape:', key_layer.shape)
+		print('<class BertSelfAttention> key_layer.transpose(-1, -2).shape:', key_layer.transpose(-1, -2).shape)
+		print('<class BertSelfAttention> attention_scores.shape:', attention_scores.shape)
+		print('<class BertSelfAttention> attention_probs.shape:', attention_probs.shape)
+		print('<class BertSelfAttention> value_layer.shape:', value_layer.shape)
+		print('<class BertSelfAttention> context_layer.shape:', context_layer.shape)
+		input('enter...')
+		'''
+		
+		
+		
+		
+		
+		
+
+
+
+
 
 		context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
 		new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
@@ -1688,7 +1738,8 @@ class PredicateAttention(nn.Module):
 				f"The hidden size ({config.hidden_size}) is not a multiple of the number of attention "
 				f"heads ({config.num_attention_heads})"
 			)
-
+		
+		'''
 		self.num_attention_heads = config.num_attention_heads
 		self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
 		self.all_head_size = self.num_attention_heads * self.attention_head_size
@@ -1696,38 +1747,86 @@ class PredicateAttention(nn.Module):
 		self.query = nn.Linear(config.hidden_size, self.all_head_size)
 		self.key = nn.Linear(config.hidden_size, self.all_head_size)
 		self.value = nn.Linear(config.hidden_size, self.all_head_size)
-		
-		
-		
-		print(config.hidden_size)
-		print(self.num_attention_heads)
-		print(self.attention_head_size)
-		print(self.all_head_size)
-		input('enter..')
-		
-		
+		'''
+		self.num_attention_heads = config.num_attention_heads
+		self.attention_head_size = int(config.hidden_size*2 / config.num_attention_heads)
+		self.all_head_size = self.num_attention_heads * self.attention_head_size
 
+		self.query = nn.Linear(config.hidden_size*2, self.all_head_size)
+		self.key = nn.Linear(config.hidden_size*2, self.all_head_size)
+		self.value = nn.Linear(config.hidden_size*2, self.all_head_size)
+		
+		
+		
 		self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 		
 		self.is_decoder = config.is_decoder
 
 	def transpose_for_scores(self, x):
 		new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+		
+		'''
+		print('<class PredicateAttention> transpose_for_scores() x.size()[:-1]:', x.size()[:-1])
+		print('<class PredicateAttention> transpose_for_scores() new_x_shape:', new_x_shape)
+		print('<class PredicateAttention> transpose_for_scores() x.view(*new_x_shape).shape:', x.view(*new_x_shape).shape)
+		'''
+		
+		
 		x = x.view(*new_x_shape)
-		return x.permute(0, 2, 1, 3)
+		
+		
+		'''
+		print('<class PredicateAttention> transpose_for_scores() x.permute(1, 0, 2).shape:', x.permute(1, 0, 2).shape)
+		#input('enter...')
+		'''
+		
+		
+		
+		#return x.permute(0, 2, 1, 3)
+		return x.permute(1, 0, 2)
 
 	def forward(
 		self,
-		hidden_states,
+		hidden_states=None,
 		attention_mask=None,
 		head_mask=None,
 		encoder_hidden_states=None,
 		encoder_attention_mask=None,
 		past_key_value=None,
 		output_attentions=False,
+		
+		
+		
+		
+		concat_e1_e2=None,
+		predicates=None,
+		
+		
 	):
-		mixed_query_layer = self.query(hidden_states)
+	
+	
+		
+				
+		
+		
+		'''
+		#print(self.num_attention_heads)
+		#print(self.attention_head_size)
+		#print(self.all_head_size)
+		print('<class PredicateAttention> concat_e1_e2.shape:', concat_e1_e2.shape)
+		print('<class PredicateAttention> predicates.shape:', predicates.shape)
+		'''
+		
+		
+		
+		
 
+
+
+	
+		mixed_query_layer = self.query(concat_e1_e2)
+		
+		'''
 		# If this is instantiated as a cross-attention module, the keys
 		# and values come from an encoder; the attention mask needs to be
 		# such that the encoder's padding tokens are not attended to.
@@ -1748,8 +1847,10 @@ class PredicateAttention(nn.Module):
 			key_layer = torch.cat([past_key_value[0], key_layer], dim=2)
 			value_layer = torch.cat([past_key_value[1], value_layer], dim=2)
 		else:
-			key_layer = self.transpose_for_scores(self.key(hidden_states))
-			value_layer = self.transpose_for_scores(self.value(hidden_states))
+		'''	
+		
+		key_layer = self.transpose_for_scores(self.key(predicates))
+		value_layer = self.transpose_for_scores(self.value(predicates))
 
 		query_layer = self.transpose_for_scores(mixed_query_layer)
 
@@ -1785,7 +1886,12 @@ class PredicateAttention(nn.Module):
 
 		context_layer = torch.matmul(attention_probs, value_layer)
 
-		context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+		#context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+		context_layer = context_layer.permute(1, 0, 2).contiguous()
+		
+		
+		
+		
 		new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
 		context_layer = context_layer.view(*new_context_layer_shape)
 
@@ -1796,6 +1902,21 @@ class PredicateAttention(nn.Module):
 		return outputs
 
 
+
+class entity_concat_ffnn(nn.Module):
+	def __init__(self, config):
+		super().__init__()
+		self.dense = nn.Linear(config.hidden_size*2, config.hidden_size)
+		if isinstance(config.hidden_act, str):
+			self.intermediate_act_fn = ACT2FN[config.hidden_act]
+		else:
+			self.intermediate_act_fn = config.hidden_act
+
+	def forward(self, hidden_states):
+		hidden_states = self.dense(hidden_states)
+		hidden_states = self.intermediate_act_fn(hidden_states)
+		return hidden_states
+		
 
 
 
@@ -1822,6 +1943,7 @@ class BertForTokenClassification(BertPreTrainedModel):
 
 		self.relation_representation = kwargs['relation_representation']
 		self.num_ppi_labels = kwargs['num_ppi_labels'] # used for 'joint-ner-ppi' task because config.num_labels are the number of NER labels.
+		self.num_entity_types = kwargs['num_entity_types']
 		self.tokenizer = kwargs['tokenizer'] # used to find entity span for 'joint-ner-ppi' task.
 		
 		self.ner_weight = kwargs['task_weights']['ner']
@@ -1845,15 +1967,37 @@ class BertForTokenClassification(BertPreTrainedModel):
 				For instance, when self.span_classifier is alive even though it's not used, the results are different. 
 				"""
 				self.enable_mention_pooling_and_context = True
-				self.enable_predicate_span = True
-				self.enable_pos_emb_loss = True
+				self.enable_predicate_span = False
+				
+				
+				self.enable_entity_type_emb = True
+				
+				
+				self.enable_predicate_attention = False
+				
+				
+				self.enable_pos_emb_loss = False
 				self.enable_ffnn_for_rep = False
 				
 				if self.enable_mention_pooling_and_context:
 					#self.span_width_embeddings = nn.Embedding(100, config.hidden_size)
 					
 					
-					self.predicate_attention = PredicateAttention(config)
+					
+					if self.enable_predicate_attention:
+						self.predicate_attention = PredicateAttention(config)
+						
+						#self.ent_concat_ffnn = entity_concat_ffnn(config)
+						
+						
+						num_of_concat_mention_span_embeds = 2
+						context_funct_hidden_size = num_of_concat_mention_span_embeds*4
+						self.context_funct_h1 = nn.Linear(config.hidden_size*num_of_concat_mention_span_embeds, config.hidden_size*context_funct_hidden_size)
+						self.context_funct_h2 = nn.Linear(config.hidden_size*context_funct_hidden_size, config.hidden_size*context_funct_hidden_size)
+						self.context_funct_o = nn.Linear(config.hidden_size*context_funct_hidden_size, config.hidden_size)
+						self.context_act_funct = nn.GELU()
+						self.context_layer_norm = nn.LayerNorm(config.hidden_size*context_funct_hidden_size, eps=config.layer_norm_eps)
+						
 					
 					
 					
@@ -1867,9 +2011,17 @@ class BertForTokenClassification(BertPreTrainedModel):
 							num_of_concat_embeds = 3
 					else:
 						# TODO: complete this.
-						num_of_concat_embeds = 4
+						num_of_concat_embeds = 7
 
 					self.rel_classifier = nn.Linear(config.hidden_size*num_of_concat_embeds, config.num_labels)
+				
+				
+				
+				if self.enable_entity_type_emb:
+					self.entity_type_embeddings = nn.Embedding(100, config.hidden_size)
+				
+				
+				
 				
 				if self.enable_pos_emb_loss:
 					self.pos_diff_embeddings = nn.Embedding(1000, config.hidden_size)
@@ -1974,6 +2126,11 @@ class BertForTokenClassification(BertPreTrainedModel):
 		relations=None,
 		
 		predicates=None,
+		
+		
+		entity_types=None,
+		
+		
 		
 		
 		directed=None,
@@ -2424,8 +2581,14 @@ class BertForTokenClassification(BertPreTrainedModel):
 					#input('enter...')
 					'''
 					
+					
+					
+					entity_type_list = [x for x in torch.split(entity_types[i], 2) if -100 not in x]
+					
+					
+					
 					# debug
-					if len(rel_list) != len(predicate_list):
+					if len(rel_list) != len(predicate_list) != len(entity_type_list):
 						print('relations[i]:', relations[i])
 						print('relations[i].shape:', relations[i].shape)
 						print('rel_list:', rel_list)
@@ -2433,6 +2596,8 @@ class BertForTokenClassification(BertPreTrainedModel):
 						print('predicate_list:', predicate_list)
 						print(len(rel_list))
 						print(len(predicate_list))
+						print('entity_types[i]:', entity_types[i])
+						print('entity_type_list:', entity_type_list)
 						input('enter...')
 					
 					
@@ -2442,7 +2607,7 @@ class BertForTokenClassification(BertPreTrainedModel):
 					#if self.enable_pos_emb_loss:
 					#	rel_span_buffer = []
 					
-					for rel, predicate in zip(rel_list, predicate_list):
+					for rel, predicate, entity_type in zip(rel_list, predicate_list, entity_type_list):
 						#rel = rel.tolist()
 						
 						e1_start  = rel[0]
@@ -2559,29 +2724,7 @@ class BertForTokenClassification(BertPreTrainedModel):
 										all_predicate_spans = torch.cat((all_predicate_spans, predicate_span))
 									
 									del predicate_span
-									
-									
-									
-								
-								
-								predicate_outputs = self.predicate_attention(
-														hidden_states,
-														attention_mask,
-														head_mask,
-														encoder_hidden_states,
-														encoder_attention_mask,
-														past_key_value,
-														output_attentions,
-													)
-									
-									
-									
-									
-									
-									
-									
-									
-									
+
 								predicate_span = torch.max(all_predicate_spans, dim=0)[0] # max_pooling
 								del all_predicate_spans
 							else:
@@ -2597,7 +2740,112 @@ class BertForTokenClassification(BertPreTrainedModel):
 								#mention_predicate_rep_z = self.dropout(mention_predicate_rep_z)
 								mention_predicate_rep_z = self.predicate_funct_o(mention_predicate_rep_z)
 								mention_predicate_rep_z = self.dropout(mention_predicate_rep_z)
+						
+						
+						
+						
+						if self.enable_predicate_attention:
 								
+							use_predicate_span = predicate[0]
+							
+							if use_predicate_span:
+								p_s_l = zip(*[iter(predicate[1:])]*2)
+								all_predicate_spans = None
+								for predicate_span_s, predicate_span_e in p_s_l:
+									predicate_span_s = torch.tensor(predicate_span_s, dtype=torch.int, device=sequence_output.device)
+									predicate_span_e = torch.tensor(predicate_span_e, dtype=torch.int, device=sequence_output.device)
+									
+									predicate_span = sequence_output[i, predicate_span_s:predicate_span_e, :]
+									
+									'''
+									#print(context)
+									print('predicate_span:', predicate_span)
+									print('predicate_span.shape:', predicate_span.shape)
+									print(torch.cat((predicate_span, predicate_span), dim=1))
+									print(torch.cat((predicate_span, predicate_span), dim=1).shape)
+									#print(context.shape)
+									#print(predicate_span.shape)
+									#print(e1_start, e1_end, e2_start, e2_end)
+									#print(predicate_span_s, predicate_span_e)
+									input('enter..')
+									'''
+									
+									
+									predicate_span = torch.cat((predicate_span, predicate_span), dim=1)
+									
+									
+									if all_predicate_spans is None:
+										all_predicate_spans = predicate_span
+									else:
+										all_predicate_spans = torch.cat((all_predicate_spans, predicate_span))
+									
+									del predicate_span
+
+								#predicate_span = torch.max(all_predicate_spans, dim=0)[0] # max_pooling
+								#del all_predicate_spans
+								
+								
+								
+								concat_e1_e2 = torch.cat((e1_rep, e2_rep))
+								
+								#concat_e1_e2_z = self.ent_concat_ffnn(concat_e1_e2) # worse than the code below
+								'''
+								concat_e1_e2_z = self.context_layer_norm(self.context_act_funct(self.context_funct_h1(concat_e1_e2)))
+								concat_e1_e2_z = self.dropout(concat_e1_e2_z)
+								concat_e1_e2_z = self.context_layer_norm(self.context_act_funct(self.context_funct_h2(concat_e1_e2_z)))
+								concat_e1_e2_z = self.dropout(concat_e1_e2_z)
+								concat_e1_e2_z = self.context_funct_o(concat_e1_e2_z)
+								concat_e1_e2_z = self.dropout(concat_e1_e2_z)
+								'''
+
+								
+								'''
+								#print('e1_rep.shape:', e1_rep.shape)
+								#print('concat_e1_e2.shape:', concat_e1_e2.shape)
+								#print('all_predicate_spans.shape:', all_predicate_spans.shape)
+								import torch.nn.functional as F
+								padded_size = concat_e1_e2.size(dim=0) - all_predicate_spans.size(dim=1)
+								#print('padded_size:', padded_size)
+								all_predicate_spans_result = F.pad(input=all_predicate_spans, pad=(0, padded_size), mode='constant', value=0)
+								#print('all_predicate_spans_result.shape:', all_predicate_spans_result.shape)
+								#print('all_predicate_spans_result:', all_predicate_spans_result)
+								'''
+								
+								predicate_outputs = self.predicate_attention(
+														
+														concat_e1_e2=torch.unsqueeze(concat_e1_e2, 0),
+														predicates=all_predicate_spans
+														
+													)
+													
+													
+								
+								#print(predicate_outputs)
+								#print(predicate_outputs[0].shape)
+								
+								predicate_outputs = predicate_outputs[0].squeeze()
+								#predicate_outputs = predicate_outputs[1000:]	
+								
+								#print(predicate_outputs)
+								#print(predicate_outputs.shape)
+								#input('enter...')
+								
+							else:
+								#predicate_outputs = torch.zeros([self.hidden_size], dtype=sequence_output.dtype, device=sequence_output.device)
+								predicate_outputs = torch.zeros([self.hidden_size*2], dtype=sequence_output.dtype, device=sequence_output.device)
+								
+								
+								#import torch.nn.functional as F
+								#predicate_outputs = F.pad(input=context, pad=(0, self.hidden_size), mode='constant', value=0)
+								
+								
+								#predicate_outputs = context
+
+
+
+						
+						
+						
 						# using span positional embeds.
 						'''
 						input_tokens = self.tokenizer.convert_ids_to_tokens(input_ids[i])
@@ -2667,7 +2915,37 @@ class BertForTokenClassification(BertPreTrainedModel):
 								
 								#e_span_rep = torch.cat((e_span_rep, z))
 								
-								
+						
+						
+						
+						if self.enable_entity_type_emb:
+							e1_type_id = entity_type[0]
+							e2_type_id = entity_type[1]
+							
+							
+							e1_type_start_emb = self.entity_type_embeddings(e1_type_id)
+							e1_type_end_emb = self.entity_type_embeddings(self.num_entity_types + e1_type_id)
+							e2_type_start_emb = self.entity_type_embeddings(e2_type_id)
+							e2_type_end_emb = self.entity_type_embeddings(self.num_entity_types + e2_type_id)
+							
+							#print('self.num_entity_types:', self.num_entity_types)
+							
+							e1_span_s_pos_embed = self.bert.embeddings.position_embeddings(e1_start-1)
+							e1_span_e_pos_embed = self.bert.embeddings.position_embeddings(e1_end)
+							e2_span_s_pos_embed = self.bert.embeddings.position_embeddings(e2_start-1)
+							e2_span_e_pos_embed = self.bert.embeddings.position_embeddings(e2_end)
+							
+							e1_type_start_emb += e1_span_s_pos_embed
+							e1_type_end_emb += e1_span_e_pos_embed
+							e2_type_start_emb += e2_span_s_pos_embed
+							e2_type_end_emb += e2_span_e_pos_embed
+							
+							
+							
+							
+							
+							
+							
 
 						
 						
@@ -2698,8 +2976,30 @@ class BertForTokenClassification(BertPreTrainedModel):
 								context = torch.stack((context, predicate_span))
 								context = torch.max(context, dim=0)[0] # max_pooling
 							
-							final_rep = torch.cat((e1_rep, context))
-							final_rep = torch.cat((final_rep, e2_rep))
+							
+							
+							if self.enable_predicate_attention:
+								
+								final_rep = torch.cat((e1_rep, context))
+								final_rep = torch.cat((final_rep, e2_rep))
+								final_rep = torch.cat((final_rep, predicate_outputs))
+								'''
+								final_rep = torch.cat((e1_rep, predicate_outputs))
+								final_rep = torch.cat((final_rep, e2_rep))
+								'''
+							elif self.enable_entity_type_emb:
+
+								final_rep = torch.cat((e1_type_start_emb, e1_rep))
+								final_rep = torch.cat((final_rep, e1_type_end_emb))
+								final_rep = torch.cat((final_rep, context))
+								final_rep = torch.cat((final_rep, e2_type_start_emb))
+								final_rep = torch.cat((final_rep, e2_rep))
+								final_rep = torch.cat((final_rep, e2_type_end_emb))
+								
+							else:
+								final_rep = torch.cat((e1_rep, context))
+								final_rep = torch.cat((final_rep, e2_rep))
+								
 							
 							
 							'''

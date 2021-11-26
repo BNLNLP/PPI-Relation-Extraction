@@ -2521,15 +2521,13 @@ class Trainer:
 
 		logits = nested_detach(logits)
 		if len(logits) == 1:
-			logits = logits[0]
-		
+			logits = logits[0]	
 		
 		# [START][GP] - return ppi_labels for PPI classification in the joint learning. 10-01-2021
 		if outputs.ppi_labels is not None:
 			labels = outputs.ppi_labels
 		# [END][GP] - return ppi_labels for PPI classification in the joint learning. 10-01-2021
-		
-		
+
 		return (loss, logits, labels)
 
 	def floating_point_ops(self, inputs: Dict[str, Union[torch.Tensor, Any]]):

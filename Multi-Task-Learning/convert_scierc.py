@@ -107,6 +107,9 @@ for file in os.listdir(data_dir):
 			entity_1 = tokens[e1_start:e1_end]
 			entity_2 = tokens[e2_start:e2_end]
 			
+			entity_1_type = entities[head]['type']
+			entity_2_type = entities[tail]['type']
+			
 			if rel_type == 'Used-for':
 				rel_id = 0
 			elif rel_type == 'Feature-of':
@@ -328,8 +331,8 @@ for file in os.listdir(data_dir):
 			
 			use_predicate_span = False
 			
-			#if predicate_exists_between_entities == False:
-			if True:
+			if predicate_exists_between_entities == False:
+			#if True:
 				num_of_found_predicates = 0 # debug
 				
 				for v in verbs:
@@ -442,8 +445,10 @@ for file in os.listdir(data_dir):
 							 'rel_type': rel_type, 
 							 'entity_1': entity_1,
 							 'entity_1_idx': (e1_start, e1_end),
+							 'entity_1_type': entity_1_type,
 							 'entity_2': entity_2,
 							 'entity_2_idx': (e2_start, e2_end),
+							 'entity_2_type': entity_2_type,
 							 'use_predicate_span': use_predicate_span,
 							 'predicates': predicates,
 							 'predicates_idx': predicates_idx})
