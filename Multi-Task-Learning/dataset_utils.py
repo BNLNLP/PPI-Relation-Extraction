@@ -719,7 +719,7 @@ def get_num_of_labels(task_name=None, dataset_dict=None, training_args=None, dat
 		
 		
 	elif task_name == 'ppi':
-		return len(json.load(open(data_args.relations)))
+		return len(json.load(open(data_args.relation_types)))
 
 
 ## [start] from NER
@@ -1103,6 +1103,199 @@ def tokenize_and_align_labels_and_find_em(examples, tokenizer, text_column_name,
 
 
 	
+
+def tokenize_and_set_relation_labels(examples, tokenizer, e1_start_id, e2_start_id, e1_end_id, e2_end_id, e_type_json, padding):
+	"""
+	
+	e1_start_id, e2_start_id, e1_end_id, e2_end_id are used for examples with 'entity_marked_sent'.
+	
+	"""
+	
+	if 'tokens' in examples:
+		tokenized_inputs = tokenizer(
+			examples['tokens'],
+			padding=padding,
+			truncation=True,
+			# We use this argument because the texts in our dataset are lists of words (with a label for each word).
+			is_split_into_words=True,	
+		)
+	elif 'entity_marked_sent' in examples:
+		tokenized_inputs = tokenizer(
+			examples['entity_marked_sent'],
+			padding=padding,
+			truncation=True,
+		)
+	else:
+		logger.error("Neither tokens or entity_marked_sent is in examples!!")
+
+
+	# debug 
+	'''
+	#for i in tokenized_inputs:
+	#	print(i)
+		
+	#print(tokenized_inputs['input_ids'])
+	for idx, elem in enumerate(tokenized_inputs['input_ids']):
+		print(tokenizer.convert_ids_to_tokens(elem))
+		#print(tokenized_inputs['token_type_ids'])
+		#print(tokenized_inputs['attention_mask'])
+		input('enter..')
+	'''
+	
+	labels = []
+	relations = []
+	predicates = []
+	entity_types = []
+	
+	for i, rel_list in enumerate(examples['relation']):
+		label_ids = []
+		relation_spans = []
+		predicate_spans = []
+		ent_types = []
+		
+		for rel in rel_list:
+			if 'tokens' in examples:
+				word_ids = tokenized_inputs.word_ids(batch_index=i)
+				
+				
+				#print(examples['tokens'][i])
+				
+				
+				e1_s, e1_e, e2_s, e2_e = rel['entity_1_idx'][0], rel['entity_1_idx'][1], rel['entity_2_idx'][0], rel['entity_2_idx'][1]
+				
+				e1_span_s = word_ids.index(e1_s)
+				e1_span_e = len(word_ids) - word_ids[::-1].index(e1_e-1) # to avoid an error for the last token.
+				e2_span_s = word_ids.index(e2_s)
+				e2_span_e = len(word_ids) - word_ids[::-1].index(e2_e-1) # to avoid an error for the last token.
+
+				# debug
+				e1_old = examples['tokens'][i][e1_s] if e1_s == e1_e else examples['tokens'][i][e1_s:e1_e]
+				e2_old = examples['tokens'][i][e2_s] if e2_s == e2_e else examples['tokens'][i][e2_s:e2_e]
+				e1_old = ''.join(e1_old) if isinstance(e1_old, list) else e1_old
+				e2_old = ''.join(e2_old) if isinstance(e2_old, list) else e2_old
+				e1_new = tokenizer.convert_ids_to_tokens(tokenized_inputs['input_ids'][i])[e1_span_s:e1_span_e]
+				e2_new = tokenizer.convert_ids_to_tokens(tokenized_inputs['input_ids'][i])[e2_span_s:e2_span_e]
+				e1_new = ''.join([x.replace('##', '') for x in e1_new])
+				e2_new = ''.join([x.replace('##', '') for x in e2_new])
+				if e1_old != e1_new or e2_old != e2_new:
+					print(examples['tokens'][i])
+					print('e1_s:', e1_s, '/ e1_e:', e1_e, '/ e2_s:', e2_s, '/ e2_e:', e2_e)
+					print('e1_old:', e1_old, '/ e2_old:', e2_old)
+					print('e1_new:', e1_new, '/ e2_new:', e2_new)
+					#input('enter..')
+				
+				'''
+				if tuple(sorted([e1_s, e1_e, e2_s, e2_e])) in ppi_unique_set:
+					print(examples['tokens'][i])
+					print('duplicate ppi set:', e1_s, e1_e, e2_s, e2_e)
+					input('enter..')
+				else:
+					ppi_unique_set.add(tuple(sorted([e1_s, e1_e, e2_s, e2_e])))
+				
+				if e1_s > e2_s:
+					print(examples['words'][i])
+					print('e1_s is greater than e2_s:', e1_s, e1_e, e2_s, e2_e)
+					input('enter..')
+				'''
+				
+				
+				use_predicate_span = 1 if rel['use_predicate_span'] else 0 
+				#predicates_text = rel['predicates']
+				predicates_info = []
+				predicates_info.append(use_predicate_span)
+				
+				if use_predicate_span:
+					for predicate_s, predicate_e in rel['predicates_idx']:
+						predicate_span_s = word_ids.index(predicate_s)
+						predicate_span_e = len(word_ids) - word_ids[::-1].index(predicate_e-1) # to avoid an error for the last token.
+						predicates_info.append(predicate_span_s)
+						predicates_info.append(predicate_span_e)
+					predicates_info.append(1000000) # use 1000000 as predicate info delimiter since a relation can have multiple predicates.
+				else: # add garbage indexes to sync with relation list.
+					predicates_info.append(-1)
+					predicates_info.append(-1)
+					predicates_info.append(1000000)
+					
+				
+				
+				entity_1_type = rel['entity_1_type']
+				entity_2_type = rel['entity_2_type']
+				entity_1_type_id = e_type_json[entity_1_type]['id']
+				entity_2_type_id = e_type_json[entity_2_type]['id']
+				
+				
+				
+				
+				
+			elif 'entity_marked_sent' in examples:
+				entity_span = get_entity_mention(tokenizer, tokenized_inputs['input_ids'][i], e1_start_id, e2_start_id, e1_end_id, e2_end_id)
+				e1_span_s = entity_span[0]
+				e1_span_e = entity_span[1]
+				e2_span_s = entity_span[2]
+				e2_span_e = entity_span[3]
+				
+				# remove entity markers from the high index number to preserve the other indices. [E1] is start idx - 1.
+				for e_idx in sorted([e1_span_s-1, e1_span_e, e2_span_s-1, e2_span_e], reverse=True):
+					tokenized_inputs['input_ids'][i].pop(e_idx)
+					if isinstance(tokenizer, RobertaTokenizerFast) == False:
+						tokenized_inputs['token_type_ids'][i].pop(e_idx)
+					tokenized_inputs['attention_mask'][i].pop(e_idx)
+					
+				# if entity 1 appears before entity 2 in the sentence,
+				if e1_span_s < e2_span_s:
+					e1_span_s = e1_span_s - 1
+					e1_span_e = e1_span_e - 1
+					e2_span_s = e2_span_s - 3
+					e2_span_e = e2_span_e - 3
+				# if entity 2 appears before entity 1 in the sentence,
+				else: 
+					e1_span_s = e1_span_s - 3
+					e1_span_e = e1_span_e - 3
+					e2_span_s = e2_span_s - 1
+					e2_span_e = e2_span_e - 1
+
+				# debug
+				'''
+				e1_new = tokenizer.convert_ids_to_tokens(tokenized_inputs['input_ids'][i])[e1_span_s:e1_span_e]
+				e2_new = tokenizer.convert_ids_to_tokens(tokenized_inputs['input_ids'][i])[e2_span_s:e2_span_e]
+				e1_new = ''.join([x.replace('##', '') for x in e1_new])
+				e2_new = ''.join([x.replace('##', '') for x in e2_new])
+				print(examples['entity_marked_sent'][i])
+				print('e1_new:', e1_new, '/ e2_new:', e2_new)
+				print('entity_1:', rel['entity_1'], '/ entity_2:', rel['entity_2'])
+				input('enter..')
+				'''
+			
+			
+			label_ids.append(rel['rel_id'])
+			relation_spans.extend([e1_span_s, e1_span_e, e2_span_s, e2_span_e, rel['rel_id']])
+			predicate_spans.extend(predicates_info)
+			ent_types.extend([entity_1_type_id, entity_2_type_id])
+			
+		labels.append(label_ids)
+		relations.append(relation_spans)
+		predicates.append(predicate_spans)
+		entity_types.append(ent_types)
+	
+	tokenized_inputs['labels'] = labels
+	tokenized_inputs['relations'] = relations
+	tokenized_inputs['predicates'] = predicates
+	tokenized_inputs['entity_types'] = entity_types
+	
+	# debug
+	'''
+	print(relations)
+	print(len(relations))
+	print(predicates)
+	print(len(predicates))
+	print(entity_types)
+	print(len(entity_types))
+	input('enter..')
+	'''
+	
+	return tokenized_inputs
+	
+	
 def featurize_data(dataset_dict, tokenizer_dict, padding, data_args, do_lower_case):
 
 	convert_func_dict = {
@@ -1110,7 +1303,8 @@ def featurize_data(dataset_dict, tokenizer_dict, padding, data_args, do_lower_ca
 		#"rte": convert_to_rte_features,
 		#"commonsense_qa": convert_to_commonsense_qa_features,
 		"ner": tokenize_and_align_labels,
-		"ppi": tokenize_and_find_em, # TODO: rename the funciton. this needs to be fixed and made cleaner later. EM: Entity Marker 
+		#"ppi": tokenize_and_find_em, # TODO: rename the funciton. this needs to be fixed and made cleaner later. EM: Entity Marker 
+		"ppi": tokenize_and_set_relation_labels,
 		"joint-ner-ppi": tokenize_and_align_labels_and_find_em, # TODO: rename the funciton. this needs to be fixed and made cleaner later.
 	}
 
@@ -1119,7 +1313,7 @@ def featurize_data(dataset_dict, tokenizer_dict, padding, data_args, do_lower_ca
 		#"rte": ['input_ids', 'attention_mask', 'labels'],
 		#"commonsense_qa": ['input_ids', 'attention_mask', 'labels'],
 		"ner": ['input_ids', 'attention_mask', 'labels', 'token_type_ids'],
-		"ppi": ['input_ids', 'attention_mask', 'labels', 'token_type_ids', 'directed', 'reverse'],
+		"ppi": ['input_ids', 'attention_mask', 'labels', 'token_type_ids', 'relations', 'predicates', 'entity_types', 'directed', 'reverse'],
 		"joint-ner-ppi": ['input_ids', 'attention_mask', 'labels', 'token_type_ids', 'ppi_relations'],
 	}
 
@@ -1131,6 +1325,16 @@ def featurize_data(dataset_dict, tokenizer_dict, padding, data_args, do_lower_ca
 											 'EM_mention_pooling', 'EM_entity_start_plus_context']:
 		columns_dict["ppi"].append('entity_mention')
 		#columns_dict["joint-ner-ppi"].append('entity_mention')
+	
+	
+	
+	
+	
+	e_type_json = json.load(open(data_args.entity_types))
+	
+	
+	
+	
 	
 	features_dict = {}
 	for task_name, dataset in dataset_dict.items():
@@ -1203,7 +1407,11 @@ def featurize_data(dataset_dict, tokenizer_dict, padding, data_args, do_lower_ca
 					batched=True,
 					load_from_cache_file=False,
 				)
+				
+				
+				
 			elif task_name == 'ppi':
+				'''
 				features_dict[task_name][phase] = phase_dataset.map(
 					convert_func_dict[task_name],
 					fn_kwargs={'tokenizer': tokenizer, 
@@ -1216,6 +1424,22 @@ def featurize_data(dataset_dict, tokenizer_dict, padding, data_args, do_lower_ca
 					batched=True,
 					load_from_cache_file=False,
 				)
+				'''
+				features_dict[task_name][phase] = phase_dataset.map(
+					convert_func_dict[task_name],
+					fn_kwargs={'tokenizer': tokenizer,
+							   'e1_start_id': e1_start_id,
+							   'e2_start_id': e2_start_id,
+							   'e1_end_id': e1_end_id,
+							   'e2_end_id': e2_end_id,
+							   'e_type_json': e_type_json,
+							   'padding': padding},
+					batched=True,
+					load_from_cache_file=False,
+				)
+				
+				
+				
 			elif task_name == 'joint-ner-ppi':
 				
 				

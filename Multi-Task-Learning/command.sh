@@ -116,20 +116,20 @@ do
 			#export NER_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/original/BioInfer/all
 			#export NER_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/original/HPRD50/all_ver_2
 			#export NER_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/original/IEPA/all_ver_1
-			#export NER_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/original/LLL/all_ver_5
+			export NER_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/original/LLL/all_ver_1
 			#export NER_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/original/LLL/all_ver_5_separate
 			#export NER_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/type_annotation/ALL/all
 			#export NER_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/type_annotation/ALL/all_incl_only_AImed_negative
 			#export NER_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/type_annotation/ALL/all_incl_only_AImed_HPRD50_IEPA_negative
 			#export NER_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/type_annotation/ALL/all_incl_only_AImed_ikb_HPRD50_IEPA_negative
-			export NER_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/type_annotation/ALL/all_incl_negative_annotation_ver_17
+			#export NER_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/type_annotation/ALL/all_incl_negative_annotation_ver_17
 			#export NER_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/type_annotation/AImed_type/all_with_negative_annotation
 			
 			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/AImed/all_ver_3
-			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/BioInfer/all
-			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/HPRD50/all_ver_2
+			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/BioInfer/all_ver_3
+			export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/HPRD50/all
 			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/IEPA/all_ver_1
-			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/LLL/all_ver_5
+			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/LLL/all_ver_1
 			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ppi/type_annotation/ALL/all
 			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ppi/type_annotation/ALL/all_incl_only_AImed_negative
 			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ppi/type_annotation/ALL/all_incl_only_AImed_HPRD50_IEPA_negative
@@ -140,7 +140,7 @@ do
 			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/conll04/converted
 			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/scierc/converted
 			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/chemprot/converted
-			export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ddi/converted
+			#export PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/ddi/converted
 			
 			#export JOINT_NER_PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/original/AImed/all_ver_3
 			#export JOINT_NER_PPI_DATA=~/BER-NLP/Multi-Task-Learning/datasets/joint_ner_ppi/original/BioInfer/all
@@ -157,11 +157,11 @@ do
 			
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/ppi_incl_negative_annotation_ver_17_transformers_ver_4_12_0_json_adding_both_directions_2
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/ppi_incl_negative_annotation_ver_17_transformers_ver_4_12_0
-			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/AImed/ver_3/orig_AImed_mtl_EM_entity_start_transformers_ver_4_12_0
-			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/BioInfer/ver_3/orig_BioInfer_ner
-			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/HPRD50/ver_2/orig_HPRD50_ner
-			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/IEPA/ver_1/orig_IEPA_ner
-			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/LLL/ver_5/orig_LLL_ppi_POSITIONAL_mention_pooling_plus_context
+			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/AImed/ver_3/orig_AImed_ppi_POSITIONAL
+			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/BioInfer/ver_3/orig_BioInfer_ppi_POSITIONAL_using_entity_type_plus_pos_emb
+			export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/HPRD50/ver_4/orig_HPRD50_ppi_POSITIONAL_using_entity_type_plus_pos_emb
+			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/IEPA/ver_1/orig_IEPA_mtl_POSITIONAL_using_entity_type_plus_pos_emb
+			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/LLL/ver_1/orig_LLL_ppi_POSITIONAL_using_entity_type_plus_pos_emb
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/LLL/ver_5_separate/orig_LLL_joint_STANDARD_mention_pooling_plus_context_epoch_30
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/original_with_bnl_ner/LLL
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/separate_data_for_ner_ppi_tasks_no_em
@@ -169,28 +169,33 @@ do
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/ppi_data_for_both_ner_ppi_tasks_with_ner_filtering
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/ADE/ppi_EM_entity_start_transformers_ver_4_12_0_json_adding_both_directions
 			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/CoNLL04/ppi_POSITIONAL_mention_pooling_plus_context
-			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/SciERT/ppi_using_predicate_attention_either_arguments_plus_context_using_entity_type_plus_pos_emb
-			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/CHEMPROT/ppi_Five_Cls_POSITIONAL_mention_pooling_plus_context_using_entity_type_plus_pos_emb_predicate
-			export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/DDI/ppi_No_parsing_error_using_entity_type_plus_pos_emb
+			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/SciERT/ppi_using_entity_type_plus_pos_emb_embsize_1000
+			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/CHEMPROT/ppi_Five_Cls_using_entity_type_plus_pos_emb_embsize_1000
+			#export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/bert_model/Multi-Task-Learning/result/DDI/ppi_No_parsing_error_using_entity_type_plus_pos_emb_embsize_100
 			
-			#export RELATION_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/relations.json
+			export RELATION_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/relations.json
 			#export RELATION_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/ppi/type_annotation/relations.json
 			#export RELATION_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/ade/converted/relations.json
 			#export RELATION_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/conll04/converted/relations.json
 			#export RELATION_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/scierc/converted/relation_types.json
 			#export RELATION_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/chemprot/converted/relation_types.json
-			export RELATION_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/ddi/converted/relation_types.json
+			#export RELATION_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/ddi/converted/relation_types.json
 			
+			#export ENTITY_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/AImed/entity_types.json
+			#export ENTITY_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/BioInfer/entity_types.json
+			export ENTITY_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/HPRD50/entity_types.json
+			#export ENTITY_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/IEPA/entity_types.json
+			#export ENTITY_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/ppi/original/LLL/entity_types.json
 			#export ENTITY_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/scierc/converted/entity_types.json
 			#export ENTITY_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/chemprot/converted/entity_types.json
-			export ENTITY_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/ddi/converted/entity_types.json
+			#export ENTITY_TYPES=~/BER-NLP/Multi-Task-Learning/datasets/ddi/converted/entity_types.json
 			
 			#srun -p volta -A nlp-sbu -t 24:00:00 -N 1 --gres=gpu:2 -J mtl \
 			#srun -p voltadebug -A nlp-sbu -t 4:00:00 -N 1 --gres=gpu:2 -J mtl \
 			
-			srun -p voltadebug -A nlp-sbu -t 4:00:00 -N 1 --gres=gpu:2 -J mtl \
+			srun -p volta -A nlp-sbu -t 24:00:00 -N 1 --gres=gpu:2 -J mtl \
 			python ~/BER-NLP/Multi-Task-Learning/run_mt_nn.py \
-				--model_list dmis-lab/biobert-base-cased-v1.1 bert-base-cased bionlp/bluebert_pubmed_uncased_L-12_H-768_A-12 \
+				--model_list dmis-lab/biobert-base-cased-v1.1 bert-base-cased \
 				--task_list ppi \
 				--do_lower_case=False \
 				--ner_data $NER_DATA \
@@ -202,6 +207,7 @@ do
 				--do_train \
 				--do_predict \
 				--num_train_epochs=10 \
+				--do_cross_validation \
 				--num_of_folds=10 \
 				--relation_representation POSITIONAL_mention_pooling_plus_context \
 				--remove_unused_columns=False \

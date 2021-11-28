@@ -18,7 +18,6 @@ from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data.sampler import RandomSampler
 from typing import List, Union, Dict, Optional, Tuple
 
-
 ## [start] from NER
 import os
 import sys
@@ -56,6 +55,9 @@ check_min_version("4.5.0.dev0")
 
 from dataset_utils import *
 
+# this is used for DDI evaluation. Remove it once DDI evaluation is combined with seqeval.
+from sklearn.metrics import f1_score, accuracy_score, classification_report, recall_score, precision_score, precision_recall_fscore_support
+						
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -107,7 +109,8 @@ class MultitaskModel(PreTrainedModel):
 				use_auth_token=True if model_args.use_auth_token else None,
 				
 				relation_representation=data_args.relation_representation,
-				num_ppi_labels=len(json.load(open(data_args.relations))),
+				num_ppi_labels=len(json.load(open(data_args.relation_types))),
+				num_entity_types=len(json.load(open(data_args.entity_types))),
 				tokenizer=tokenizer_dict[task_name],
 				task_weights=task_weights_dict
 
@@ -513,8 +516,11 @@ class DataTrainingArguments:
 						   This is a step after multi-task learning, which replaces a task head with a new one. \
 						   This option is only needed for multi-task learning."}
 	)
-	relations: str = field(
-		default=None, metadata={"help": "Relation file (name and id)."}
+	relation_types: str = field(
+		default=None, metadata={"help": "Relation type file (name and id)."}
+	)
+	entity_types: str = field(
+		default=None, metadata={"help": "Entity type file (name and id)."}
 	)
 	relation_representation: str = field(
 		default='EM_entity_start',
@@ -523,6 +529,7 @@ class DataTrainingArguments:
 						   Options: \
 						   1) standard: STANDARD_cls_token, STANDARD_mention_pooling, STANDARD_mention_pooling_plus_context \
 						   2) entity markers (EM): EM_cls_token, EM_mention_pooling, EM_entity_start, EM_entity_start_plus_context \
+						   3) positional emb: POSITIONAL_mention_pooling_plus_context \
 						   - multiple relations: Multiple_Relations \
 						   * for poolings, max pooling is used. "}
 	)
@@ -671,7 +678,7 @@ def evaluate_results(net, test_loader, pad_id, cuda):
 
 
 def save_results(results_dict, data_list, task_list, learning_type, label_list, output_dir, \
-				 do_cross_validation, save_misclassified_samples, relations):
+				 do_cross_validation, save_misclassified_samples, relation_types):
 	
 	if do_cross_validation:
 		all_results_per_data_and_task = {}
@@ -700,35 +707,75 @@ def save_results(results_dict, data_list, task_list, learning_type, label_list, 
 			tokenizer_dict = result['tokenizer_dict']
 	
 			for task_name, pred_output in preds_dict.items():
-				if task_name == 'ner' or task_name == 'ppi-multiple':
-								
-					## [start] from NER
-					# Metrics
-					metric = load_metric("seqeval")
+				if task_name == 'ner' or task_name == 'ppi-multiple' or task_name == 'ppi':
+
+					predictions, labels = pred_output.predictions, pred_output.label_ids
+					predictions = np.argmax(predictions, axis=2)
 					
-					#ner_label_list = label_list['ner']
+					# ner labels: ['B-PROT', 'B-SPECIES', 'I-PROT', 'I-SPECIES', 'O']
+					# ner labels: ['B-PROT', 'I-PROT', 'O']
+					# ppi labels: ['positive', 'negative']
+					# ppi labels: ['enzyme', 'structural', 'negative']
+
 					task_label_list = label_list[task_name]
 					
-					def compute_metrics(p):
-						predictions, labels = p
-						predictions = np.argmax(predictions, axis=2)
+					# Remove ignored index (special tokens)
+					true_predictions = [
+						[task_label_list[p] for (p, l) in zip(prediction, label) if l != -100]
+						for prediction, label in zip(predictions, labels)
+					]
+					true_labels = [
+						[task_label_list[l] for (p, l) in zip(prediction, label) if l != -100]
+						for prediction, label in zip(predictions, labels)
+					]
+					
+					# debug
+					'''
+					print(task_name, pred_output.predictions)
+					print(task_name, pred_output.predictions.shape)
+					print(task_name, pred_output.predictions[:, :true_label_len, :])
+					print(task_name, pred_output.predictions[:, :true_label_len, :].shape)
+					print(task_name, pred_output.label_ids)
+					print(task_name, pred_output.label_ids.shape)
+					input('enter..')
+					'''
+
+					if task_name == 'ner':
+						## [start] from NER
+						metric = load_metric("seqeval") # Metrics
+					
+						''' Test code for one class classification for ADE data. Not working... 11-12-2021
+						ppp = []
+						for i in predictions:
+							t = []
+							for j in i:
+								print('j[0]:', j[0])
+								print('torch.sigmoid(j[0]):', torch.sigmoid(torch.tensor(j[0])))
+								if torch.sigmoid(torch.tensor(j[0])) > 0.5:
+									t.append(0)
+								else:
+									t.append(1)
+							
+							print('t:', t)
+							print('len(t):', len(t))
+							
+							ppp.append(t)
+												
+						ppp = np.asarray(ppp)
 						
+						#ppp = np.array(ppp)[indices.astype(int)]
+						#labels = labels.tolist()
+						#task_label_list = {0: "Adverse-Effect", 1: "no_relation"}
 
-						# ner labels: ['B-PROT', 'B-SPECIES', 'I-PROT', 'I-SPECIES', 'O']
-						# ner labels: ['B-PROT', 'I-PROT', 'O']
-						# ppi labels: ['positive', 'negative']
-						# ppi labels: ['enzyme', 'structural', 'negative']
-
-
-						# Remove ignored index (special tokens)
 						true_predictions = [
-							[task_label_list[p] for (p, l) in zip(prediction, label) if l != -100]
-							for prediction, label in zip(predictions, labels)
+							[task_label_list[p] for (p, l) in zip(pefe, label) if l != -100]
+							for pefe, label in zip(ppp, labels)
 						]
 						true_labels = [
-							[task_label_list[l] for (p, l) in zip(prediction, label) if l != -100]
-							for prediction, label in zip(predictions, labels)
+							[task_label_list[l] for (p, l) in zip(pefe, label) if l != -100]
+							for pefe, label in zip(ppp, labels)
 						]
+						'''
 
 						results = metric.compute(predictions=true_predictions, references=true_labels)
 						'''
@@ -744,33 +791,57 @@ def save_results(results_dict, data_list, task_list, learning_type, label_list, 
 							return final_results
 						else:
 						'''
-						return {
-							"precision": results["overall_precision"],
-							"recall": results["overall_recall"],
-							"f1": results["overall_f1"],
-							"accuracy": results["overall_accuracy"],
-						}
-					## [end] from NER
+						
+						# ref: https://github.com/huggingface/datasets/blob/master/metrics/seqeval/seqeval.py
+						# overall_score = report.pop("micro avg")
+						result = {"precision": results["overall_precision"], 
+								  "recall": results["overall_recall"],
+								  "f1": results["overall_f1"],
+								  "accuracy": results["overall_accuracy"]}
+						## [end] from NER
+					else:
+						if 'DDI-false' in task_label_list: # for DDI, ignore DDI-false labels.
+							cleaned_pred_labels = []
+							for i in true_predictions:
+								for j in i:
+									if j == 'DDI-false':
+										cleaned_pred_labels.append('false')
+									else:
+										cleaned_pred_labels.append(j)
+							pred_labels = cleaned_pred_labels
+							task_label_list.remove('DDI-false')
+						else:
+							pred_labels = [x for sublist in true_predictions for x in sublist]
+						
+						true_labels = [x for sublist in true_labels for x in sublist]
 
-					# TODO: this is a temporary code. It's because of manual length (2000) of prediction's ppi relation length. 
-					true_label_len = pred_output.label_ids.shape[1] 
-					
-									
-				
-					'''
-					print(task_name, pred_output.predictions)
-					print(task_name, pred_output.predictions.shape)
-					print(task_name, pred_output.predictions[:, :true_label_len, :])
-					print(task_name, pred_output.predictions[:, :true_label_len, :].shape)
-					print(task_name, pred_output.label_ids)
-					print(task_name, pred_output.label_ids.shape)
-					input('enter..')
-					'''
-					
-					
-					#result = compute_metrics((pred_output.predictions, pred_output.label_ids))
-					result = compute_metrics((pred_output.predictions[:, :true_label_len, :], pred_output.label_ids))
-					
+						# debug
+						'''
+						with open(os.path.join(output_dir, data_name + '_' + learning_type + '_' + task_name + '_pred_labels.txt'), 'a') as fp:
+							for element in pred_labels:
+								fp.write(element + "\n")
+						with open(os.path.join(output_dir, data_name + '_' + learning_type + '_' + task_name + '_actual_labels.txt'), 'a') as fp:
+							for element in true_labels:
+								fp.write(element + "\n")
+						'''
+
+						#f1score = f1_score(y_pred=pred_labels, y_true=true_labels, average='micro', labels=task_label_list)
+						precision, recall, f1, _ = precision_recall_fscore_support(y_pred=pred_labels, y_true=true_labels, \
+																				   labels=task_label_list, average='micro')
+						accuracy = accuracy_score(true_labels, pred_labels) # TODO: ignore 'DDI-false' for DDI evaluation.
+						
+						print("<sklearn> - classification_report")
+						print(classification_report(true_labels, pred_labels, digits=4, labels=task_label_list))
+						print('<sklearn> precision:', precision)
+						print('<sklearn> recall:', recall)
+						print('<sklearn> f1:', f1) # this is the same as f1_score.
+						print('<sklearn> accuracy:', accuracy)
+
+						result = {"precision": precision, 
+								  "recall": recall,
+								  "f1": f1,
+								  "accuracy": accuracy}
+						
 					with open(os.path.join(output_dir, data_name + '_' + learning_type + '_' + task_name + '_result.txt'), 'a') as fp:
 						out_s = 'cv ' if do_cross_validation else ''
 						out_s += "set: {set:d} / accuracy: {accuracy:.4f} / precision: {precision:.4f} / recall: {recall:.4f} / f1: {f1:.4f}\n".format(set=dataset_num, accuracy=result['accuracy'], precision=result['precision'], recall=result['recall'], f1=result['f1'])
@@ -782,7 +853,8 @@ def save_results(results_dict, data_list, task_list, learning_type, label_list, 
 						all_results_per_data_and_task[data_name][task_name]['precision'].append(result['precision'])
 						all_results_per_data_and_task[data_name][task_name]['recall'].append(result['recall'])
 						all_results_per_data_and_task[data_name][task_name]['f1'].append(result['f1'])
-
+				
+				"""
 				elif task_name == 'ppi':
 					
 					'''
@@ -834,7 +906,10 @@ def save_results(results_dict, data_list, task_list, learning_type, label_list, 
 									miscls_samples_per_data_and_task[data_name][task_name][key].append(miscls_sent)
 								else:
 									miscls_samples_per_data_and_task[data_name][task_name][key] = [miscls_sent]
-
+					
+					pred_stat = ''
+					true_stat = ''
+					'''
 					pred_type_counter = {}
 					for label in pred:
 						if label.item() in pred_type_counter:
@@ -844,7 +919,7 @@ def save_results(results_dict, data_list, task_list, learning_type, label_list, 
 
 					pred_stat = 'pred - '
 					for id, cnt in pred_type_counter.items():
-						for rel_name, info in relations.items():
+						for rel_name, info in relation_types.items():
 							if info['id'] == id:
 								id_to_name = rel_name
 								break
@@ -861,14 +936,15 @@ def save_results(results_dict, data_list, task_list, learning_type, label_list, 
 					
 					true_stat = 'true - '
 					for id, cnt in true_type_counter.items():
-						for rel_name, info in relations.items():
+						for rel_name, info in relation_types.items():
 							if info['id'] == id:
 								id_to_name = rel_name
 								break
 						true_stat += id_to_name + ': ' + str(cnt) + ' / '
 					
 					true_stat += 'total: ' + str(sum(true_type_counter.values()))
-
+					'''
+					
 					from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
 
 					# LBERT used micro scores. I also tested with micro scores, but it wan't quite different from weighted. 	
@@ -900,7 +976,8 @@ def save_results(results_dict, data_list, task_list, learning_type, label_list, 
 						all_results_per_data_and_task[data_name][task_name]['precision'].append(result['precision'])
 						all_results_per_data_and_task[data_name][task_name]['recall'].append(result['recall'])
 						all_results_per_data_and_task[data_name][task_name]['f1'].append(result['f1'])
-			
+				"""
+				
 	if do_cross_validation:
 		for data_name, tasks in all_results_per_data_and_task.items():
 			for task_name, all_results in tasks.items():
@@ -1035,7 +1112,8 @@ def main():
 		results_dict = {} # store prediction results for each dataset and task.
 		label_list = {} # label_list['ner'] is used when storing NER results.
 		
-		relations = json.load(open(data_args.relations))
+		relation_types = json.load(open(data_args.relation_types))
+		entity_types = json.load(open(data_args.entity_types))
 
 		for dataset_num in range(num_of_datasets):
 			logger.info("\n\n*** Dataset number: " + str(dataset_num) + " ***\n\n")
@@ -1064,14 +1142,14 @@ def main():
 							label_list['ner'] = get_label_list(dataset_dict[task_name]["test"]["ner"])	
 					
 					if 'ppi-multiple' not in label_list:
-						label_list['ppi-multiple'] = relations.keys()
+						label_list['ppi-multiple'] = list(relation_types.keys())
 				
 				# this is not used for now.
-				'''
+				
 				if task_name == 'ppi':
 					if 'ppi' not in label_list:
-						label_list['ppi'] = relations.keys()
-				'''
+						label_list['ppi'] = list(relation_types.keys())
+				
 
 			# debugging
 			'''
@@ -1354,7 +1432,8 @@ def main():
 					if do_fine_tune:
 						task_model = AutoModelForTokenClassification.from_pretrained(os.path.join(training_args.output_dir, task_name),
 																					 relation_representation=data_args.relation_representation,
-																					 num_ppi_labels=len(relations),
+																					 num_ppi_labels=len(relation_types),
+																					 num_entity_types=len(entity_types),
 																					 tokenizer=tokenizer_dict[task_name],
 																					 task_weights={'ner': 1, 'ppi': 1},)
 
@@ -1472,7 +1551,7 @@ def main():
 			
 			save_results(results_dict, data_list, task_list, learning_type, label_list, \
 						 training_args.output_dir, \
-						 data_args.do_cross_validation, data_args.save_misclassified_samples, relations)
+						 data_args.do_cross_validation, data_args.save_misclassified_samples, relation_types)
 		
 		# TODO: this needs to be fixed and made cleaner later.
 		if is_joint_learning:
