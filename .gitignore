@@ -12,6 +12,7 @@ __pycache__/
 models/
 datasets/
 src/relation_extraction/backup/
+src/relation_extraction/conversion/tokenization_using_spacy/
 #src/relation_extraction/optimize_model.py
 #tests/fixtures/cached_*_text.txt
 #logs/
