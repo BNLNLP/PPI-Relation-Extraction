@@ -961,17 +961,7 @@ def tokenize_and_set_relation_labels(examples, tokenizer, padding, max_seq_lengt
 		
 		for rel in rel_list:
 			if 'text' in examples:
-				if relation_representation.startswith('EM'):
-					if use_entity_typed_marker:
-						e1_s, e1_e = rel['entity_1_idx_in_text_with_typed_entity_marker']
-						e2_s, e2_e = rel['entity_2_idx_in_text_with_typed_entity_marker']
-					else:
-						e1_s, e1_e = rel['entity_1_idx_in_text_with_entity_marker']
-						e2_s, e2_e = rel['entity_2_idx_in_text_with_entity_marker']
-				else:
-					e1_s, e1_e = rel['entity_1_idx']
-					e2_s, e2_e = rel['entity_2_idx']
-
+				
 				### TODO: test this with original entity tokens.
 				# ref: https://www.lighttag.io/blog/sequence-labeling-with-transformers/example
 				# ref: https://github.com/huggingface/transformers/issues/9326
@@ -991,11 +981,39 @@ def tokenize_and_set_relation_labels(examples, tokenizer, padding, max_seq_lengt
 						#if char_idx == len(examples[token_key][i]):
 						#	raise Exception("End token not found: " f"{tokenizer.convert_ids_to_tokens(tokenized_inputs['input_ids'][i])}")
 
-				e1_span_s = get_token_idx(e1_s)
-				e1_span_e = get_token_idx(e1_e)
-				e2_span_s = get_token_idx(e2_s)
-				e2_span_e = get_token_idx(e2_e)
+				e1_span_idx_list, e2_span_idx_list = [], []
 				
+				if relation_representation.startswith('EM'):
+					if use_entity_typed_marker:
+						e1_idx = rel['entity_1_idx_in_text_with_typed_entity_marker']
+						e2_idx = rel['entity_2_idx_in_text_with_typed_entity_marker']
+					else:
+						e1_idx = rel['entity_1_idx_in_text_with_entity_marker']
+						e2_idx = rel['entity_2_idx_in_text_with_entity_marker']
+					
+					if np.asarray(e1_idx).ndim > 1 or np.asarray(e2_idx).ndim > 1:
+						raise Exception("For now, entity marker representations do not support separate entities.")
+				else:
+					e1_idx = rel['entity_1_idx']
+					e2_idx = rel['entity_2_idx']
+				
+				# Some dataset (e.g., BioInfer) has entities consisting of separate tokens.
+				# To match the dimension to separate entities, add a dimension for single entities. 
+				e1_idx = [e1_idx] if np.asarray(e1_idx).ndim == 1 else e1_idx
+				e2_idx = [e2_idx] if np.asarray(e2_idx).ndim == 1 else e2_idx
+				
+				for e1_s, e1_e in e1_idx:
+					e1_span_s = get_token_idx(e1_s)
+					e1_span_e = get_token_idx(e1_e)
+					e1_span_idx_list.append((e1_span_s, e1_span_e))
+				
+				for e2_s, e2_e in e2_idx:
+					e2_span_s = get_token_idx(e2_s)
+					e2_span_e = get_token_idx(e2_e)
+					e2_span_idx_list.append((e2_span_s, e2_span_e))
+			
+			## TODO: update 'tokens' examples referring to the code above.
+			"""	
 			elif 'tokens' in examples:
 				if relation_representation.startswith('EM'):
 					e1_s, e1_e = rel['entity_1_idx_in_tokens_with_marker']
@@ -1029,36 +1047,39 @@ def tokenize_and_set_relation_labels(examples, tokenizer, padding, max_seq_lengt
 					predicates_info.append(-1)
 					predicates_info.append(1000000)
 				'''
-				
+			"""
+			
 			entity_1_type_id = rel['entity_1_type_id']
 			entity_2_type_id = rel['entity_2_type_id']
 
 			label_ids.append(rel['relation_id'])
-			relation_spans.extend([e1_span_s, e1_span_e, e2_span_s, e2_span_e, rel['relation_id']])
+			relation_spans.extend([e1_span_idx_list, e2_span_idx_list])
 			#predicate_spans.extend(predicates_info)
 			ent_types.extend([entity_1_type_id, entity_2_type_id])
 			
+			## TODO: Add a debug condition for entities consisting of separate tokens. 
 			# debug
-			e1_old = examples[token_key][i][e1_s] if e1_s == e1_e else examples[token_key][i][e1_s:e1_e]
-			e2_old = examples[token_key][i][e2_s] if e2_s == e2_e else examples[token_key][i][e2_s:e2_e]
-			e1_old = ''.join(e1_old) if isinstance(e1_old, list) else e1_old
-			e2_old = ''.join(e2_old) if isinstance(e2_old, list) else e2_old
-			e1_new = tokenizer.convert_ids_to_tokens(tokenized_inputs['input_ids'][i])[e1_span_s:e1_span_e]
-			e2_new = tokenizer.convert_ids_to_tokens(tokenized_inputs['input_ids'][i])[e2_span_s:e2_span_e]
-			e1_new = ''.join([x.replace('##', '') for x in e1_new])
-			e2_new = ''.join([x.replace('##', '') for x in e2_new])
-			if re.sub(r'\s*', '', e1_old.lower()) != re.sub(r'\s*', '', e1_new.lower()) or \
-			   re.sub(r'\s*', '', e2_old.lower()) != re.sub(r'\s*', '', e2_new.lower()):
-				print(examples[token_key][i])
-				print(tokenizer.convert_ids_to_tokens(tokenized_inputs['input_ids'][i]))
-				print('e1_s:', e1_s, '/ e1_e:', e1_e, '/ e2_s:', e2_s, '/ e2_e:', e2_e)
-				print('e1_span_s:', e1_span_s, '/ e1_span_e:', e1_span_e, '/ e2_span_s:', e2_span_s, '/ e2_span_e:', e2_span_e)
-				print('e1_old:', re.sub(r'\s*', '', e1_old.lower()), '/ e2_old:', re.sub(r'\s*', '', e2_old.lower()))
-				print('len(e1_old):', len(re.sub(r'\s*', '', e1_old.lower())), '/ len(e2_old):', len(re.sub(r'\s*', '', e2_old.lower())))
-				print('e1_new:', re.sub(r'\s*', '', e1_new.lower()), '/ e2_new:', re.sub(r'\s*', '', e2_new.lower()))
-				print('len(e1_new):', len(re.sub(r'\s*', '', e1_new.lower())), '/ len(e2_new):', len(re.sub(r'\s*', '', e2_new.lower())))
-				input('enter..')
-		
+			if len(e1_span_idx_list) == 1 and len(e2_span_idx_list) == 1:
+				e1_old = examples[token_key][i][e1_s] if e1_s == e1_e else examples[token_key][i][e1_s:e1_e]
+				e2_old = examples[token_key][i][e2_s] if e2_s == e2_e else examples[token_key][i][e2_s:e2_e]
+				e1_old = ''.join(e1_old) if isinstance(e1_old, list) else e1_old
+				e2_old = ''.join(e2_old) if isinstance(e2_old, list) else e2_old
+				e1_new = tokenizer.convert_ids_to_tokens(tokenized_inputs['input_ids'][i])[e1_span_s:e1_span_e]
+				e2_new = tokenizer.convert_ids_to_tokens(tokenized_inputs['input_ids'][i])[e2_span_s:e2_span_e]
+				e1_new = ''.join([x.replace('##', '') for x in e1_new])
+				e2_new = ''.join([x.replace('##', '') for x in e2_new])
+				if re.sub(r'\s*', '', e1_old.lower()) != re.sub(r'\s*', '', e1_new.lower()) or \
+				   re.sub(r'\s*', '', e2_old.lower()) != re.sub(r'\s*', '', e2_new.lower()):
+					print(examples[token_key][i])
+					print(tokenizer.convert_ids_to_tokens(tokenized_inputs['input_ids'][i]))
+					print('e1_s:', e1_s, '/ e1_e:', e1_e, '/ e2_s:', e2_s, '/ e2_e:', e2_e)
+					print('e1_span_s:', e1_span_s, '/ e1_span_e:', e1_span_e, '/ e2_span_s:', e2_span_s, '/ e2_span_e:', e2_span_e)
+					print('e1_old:', re.sub(r'\s*', '', e1_old.lower()), '/ e2_old:', re.sub(r'\s*', '', e2_old.lower()))
+					print('len(e1_old):', len(re.sub(r'\s*', '', e1_old.lower())), '/ len(e2_old):', len(re.sub(r'\s*', '', e2_old.lower())))
+					print('e1_new:', re.sub(r'\s*', '', e1_new.lower()), '/ e2_new:', re.sub(r'\s*', '', e2_new.lower()))
+					print('len(e1_new):', len(re.sub(r'\s*', '', e1_new.lower())), '/ len(e2_new):', len(re.sub(r'\s*', '', e2_new.lower())))
+					input('enter..')
+			
 		labels.append(label_ids)
 		relations.append(relation_spans)
 		#predicates.append(predicate_spans)

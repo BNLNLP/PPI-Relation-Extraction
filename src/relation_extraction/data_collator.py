@@ -70,7 +70,12 @@ class DataCollatorForRelationClassification:
 		
 		# [START][GP] - padding 'relations' for relation classification
 		if "relations" in batch:
-			rel_max_length = max(map(len, batch["relations"]))
+			## TODO: this will be needed when multiple relations in a single input are supported. 04-21-2022
+			#rel_max_length = max(map(len, batch["relations"]))
+			
+			e1_max_length = max(map(len, [x[0] for x in batch["relations"]]))
+			e2_max_length = max(map(len, [x[1] for x in batch["relations"]]))
+			e_max_length = max(e1_max_length, e2_max_length)
 		# [END][GP] - padding 'relations' for relation classification
 		
 		# [START][GP] - padding 'predicates' for relation classification. 11-14-2021
@@ -82,7 +87,6 @@ class DataCollatorForRelationClassification:
 		if "entity_types" in batch:
 			entity_types_max_length = max(map(len, batch["entity_types"]))
 		# [END][GP] - padding 'entity_types' for relation classification 11-23-2021
-		
 
 		padding_side = self.tokenizer.padding_side
 		if padding_side == "right":
@@ -90,10 +94,15 @@ class DataCollatorForRelationClassification:
 				list(label) + [self.label_pad_token_id] * (label_max_length - len(label)) for label in labels
 			]
 			
-
 			# [START][GP] - padding 'relations' for relation classification
 			if "relations" in batch:
-				batch["relations"] = [relation + [self.label_pad_token_id] * (rel_max_length - len(relation)) for relation in batch["relations"]]
+				
+				## TODO: this will be needed when multiple relations in a single input are supported. 04-21-2022
+				#batch["relations"] = [relation + [self.label_pad_token_id] * (rel_max_length - len(relation)) for relation in batch["relations"]]
+				
+				for x in batch["relations"]:
+					x[0] = x[0] + [[self.label_pad_token_id, self.label_pad_token_id]] * (e_max_length - len(x[0]))
+					x[1] = x[1] + [[self.label_pad_token_id, self.label_pad_token_id]] * (e_max_length - len(x[1]))
 			# [END][GP] - padding 'relations' for relation classification
 			
 			# [START][GP] - padding 'predicates' for relation classification. 11-14-2021
@@ -109,10 +118,11 @@ class DataCollatorForRelationClassification:
 			### TODO: handle this case.
 			pass
 		
-		
-		
+
 		batch = {k: torch.tensor(v, dtype=torch.int64) for k, v in batch.items()}
 		
+		
+		# debug
 		'''
 		for k, v in batch.items():
 			print(k, v)

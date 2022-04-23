@@ -57,13 +57,13 @@ class BertForRelationClassification(BertPreTrainedModel):
 			# ref: https://ai.stackexchange.com/questions/28564/how-to-determine-the-embedding-size
 			# ref: https://www.quora.com/How-do-I-determine-the-number-of-dimensions-for-word-embedding
 			# ref: https://developers.googleblog.com/2017/11/introducing-tensorflow-feature-columns.html
-			self.entity_type_emb_size = round((self.num_entity_types*2)**0.25)
+			#self.entity_type_emb_size = round((self.num_entity_types*2)**0.25)
 			
 			# Option 2
 			# ref: https://ai.stackexchange.com/questions/28564/how-to-determine-the-embedding-size
 			# ref: https://books.google.com/books?id=dDwDEAAAQBAJ&pg=PA48&lpg=PA48&dq=%22If+we%E2%80%99re+in+a+hurry,+one+rule+of+thumb+is+to+use+the+fourth+root+of+the+total+number+of+unique+categorical+elements+while+another+is+that+the+embedding+dimension+should+be+approximately+1.6+times+the+square+root+of+the+number+of+unique+elements+in+the+category,+and+no+less+than+600.%22&source=bl&ots=u9MG_ebFR9&sig=ACfU3U1KZID6yQlF89RmcDPWbNmkexamRg&hl=en&sa=X&ved=2ahUKEwisgJz8h_72AhUTkYkEHZ0IB9QQ6AF6BAgCEAM#v=onepage&q=%22If%20we%E2%80%99re%20in%20a%20hurry%2C%20one%20rule%20of%20thumb%20is%20to%20use%20the%20fourth%20root%20of%20the%20total%20number%20of%20unique%20categorical%20elements%20while%20another%20is%20that%20the%20embedding%20dimension%20should%20be%20approximately%201.6%20times%20the%20square%20root%20of%20the%20number%20of%20unique%20elements%20in%20the%20category%2C%20and%20no%20less%20than%20600.%221.6&f=false
-			#import math
-			#self.entity_type_emb_size = round(1.6*math.sqrt(self.num_entity_types*2))		
+			import math
+			self.entity_type_emb_size = round(1.6*math.sqrt(self.num_entity_types*2))		
 		
 			self.entity_type_embeddings = nn.Embedding(self.num_entity_types*2, self.entity_type_emb_size)
 
@@ -180,12 +180,7 @@ class BertForRelationClassification(BertPreTrainedModel):
 		# offset used to find local context. In case of entity markers, ignore marker tokens for local context.
 		# E.g., in the sample [E1] gene1 [/E1] activates [E2] gene2 [/E2], the local context should be just 'activates'.
 		lc_offset = 1 if self.relation_representation.startswith('EM') else 0
-		
-		
-		
-		
-		
-		
+
 		### TODO: fix the error that 'STANDARD_cls_token', 'EM_cls_token' have the same results.
 		if self.relation_representation in ['STANDARD_cls_token', 'EM_cls_token']:
 			cls_token = self.dropout(pooled_output)
@@ -194,10 +189,11 @@ class BertForRelationClassification(BertPreTrainedModel):
 		
 		else:
 			buffer = []
-			n = 0 # num_newly_added_label (used for undirected (symmetric) relations)
+			#n = 0 # num_newly_added_label (used for undirected (symmetric) relations)
+			
 			# iterate batch & collect
 			for i in range(sequence_output.size()[0]):
-				rel_list = [x for x in torch.split(relations[i], 5) if -100 not in x] # e1_span_s, e1_span_e, e2_span_s, e2_span_e, rel['rel_id']
+				rel_list = [x for x in torch.split(relations[i], 2) if all(xx == -100 for xx in x.tolist()) is False] # e1_span_idx_list, e2_span_idx_list
 				entity_type_list = [x for x in torch.split(entity_types[i], 2) if -100 not in x]
 				
 				'''
@@ -212,39 +208,58 @@ class BertForRelationClassification(BertPreTrainedModel):
 						p_i = []
 				'''		
 				
-				
 				# In case of EM, a sample has a single relation. In case of marker-free, a sample can have multiple relations.
 				#for rel, predicate, entity_type in zip(rel_list, predicate_list, entity_type_list):
 				for rel, entity_type in zip(rel_list, entity_type_list):
-					e1_start  = rel[0]
-					e1_end    = rel[1]
-					e2_start  = rel[2]
-					e2_end    = rel[3]
-					rel_label = rel[4]
+					e1_span_idx_list = rel[0]
+					e2_span_idx_list = rel[1]
 					
+					# Delete pad index [-100, -100].
+					e1_span_idx_list = e1_span_idx_list[e1_span_idx_list.sum(dim=1) > 0]
+					e2_span_idx_list = e2_span_idx_list[e2_span_idx_list.sum(dim=1) > 0]
+					
+					# Another way to delete pad index.
+					#e1_span_idx_list = e1_span_idx_list[e1_span_idx_list.eq(torch.tensor([-100, -100])) == False]
+					#e2_span_idx_list = e2_span_idx_list[e2_span_idx_list.eq(torch.tensor([-100, -100])) == False]
+
 					if self.relation_representation in ['EM_entity_start']:
 						e1_rep = sequence_output[i, e1_start-1, :]
 						e2_rep = sequence_output[i, e2_start-1, :]
 						
 					elif self.relation_representation in ['STANDARD_mention_pooling', 'EM_mention_pooling']:
-						e1_rep = sequence_output[i, e1_start:e1_end, :]
-						e1_rep = torch.transpose(e1_rep, 0, 1)
-						e1_rep = torch.max(e1_rep, dim=1)[0] # max_pooling
+						all_e1_rep = None
+						for e1_start, e1_end in e1_span_idx_list:
+							e1_rep = sequence_output[i, e1_start:e1_end, :]
+							all_e1_rep = torch.cat((all_e1_rep, e1_rep)) if all_e1_rep is not None else e1_rep
 						
-						e2_rep = sequence_output[i, e2_start:e2_end, :]
-						e2_rep = torch.transpose(e2_rep, 0, 1)
-						e2_rep = torch.max(e2_rep, dim=1)[0] # max_pooling
-					
-					
-					
-					if self.use_context == 'attn_based':
+						e1_rep = torch.max(all_e1_rep, dim=0)[0] # max_pooling
+						del all_e1_rep
+						
+						all_e2_rep = None
+						for e2_start, e2_end in e2_span_idx_list:
+							e2_rep = sequence_output[i, e2_start:e2_end, :]
+							all_e2_rep = torch.cat((all_e2_rep, e2_rep)) if all_e2_rep is not None else e2_rep
+						
+						e2_rep = torch.max(all_e2_rep, dim=0)[0] # max_pooling
+						del all_e2_rep
 
-						e1_attn = attention_output[i,:,e1_start,:]
-						e2_attn = attention_output[i,:,e2_start,:]
+					if self.use_context == 'attn_based':
+						all_e1_attn = None
+						for e1_start, e1_end in e1_span_idx_list:
+							e1_attn = attention_output[i,:,e1_start:e1_end,:]
+							all_e1_attn = torch.cat((all_e1_attn, e1_attn), dim=1) if all_e1_attn is not None else e1_attn
 						
-						e1_attn = torch.sum(e1_attn, 0)
-						e2_attn = torch.sum(e2_attn, 0)
+						e1_attn = all_e1_attn.sum(0).sum(0)
+						del all_e1_attn
 						
+						all_e2_attn = None
+						for e2_start, e2_end in e2_span_idx_list:
+							e2_attn = attention_output[i,:,e2_start:e2_end,:]
+							all_e2_attn = torch.cat((all_e2_attn, e2_attn), dim=1) if all_e2_attn is not None else e2_attn
+						
+						e2_attn = all_e2_attn.sum(0).sum(0)
+						del all_e2_attn
+
 						# ref: https://discuss.pytorch.org/t/find-indices-of-a-tensor-satisfying-a-condition/80802
 						#b = input_ids[i] <= 4
 						#tokens_to_ignore = b.nonzero()
@@ -252,9 +267,25 @@ class BertForRelationClassification(BertPreTrainedModel):
 
 						input_tokens = self.tokenizer.convert_ids_to_tokens(input_ids[i])
 						
-						# ignore special tokens and tokens not having any alphanumeric character.
-						tokens_to_ignore = [idx for idx, x in enumerate(input_tokens) 
-											if x in self.tokenizer.all_special_tokens or re.search('[a-zA-Z0-9]', x) == None]
+						# Ignore special tokens and tokens not having any alphanumeric character.
+						# Also, exclude entities.
+						tokens_to_ignore = [idx for idx, tok in enumerate(input_tokens) 
+											if tok in self.tokenizer.all_special_tokens or re.search('[a-zA-Z0-9]', tok) == None or 
+											   (idx >= e1_start and idx < e1_end) or (idx >= e2_start and idx < e2_end)]
+						
+						
+						'''
+						for x in tokens_to_ignore:
+							if (x >= e1_start and x < e1_end) or (x >= e2_start and x < e2_end):
+								print('x:', x, '/ token:', input_tokens[x])
+								print(e1_start, e1_end)
+								print(e2_start, e2_end)
+								print(input_ids[i])
+								print(input_tokens)
+								input('enter..')
+						'''		
+						
+						
 						
 						#target = torch.tensor(tokens_to_ignore)
 						#tmp_input = e1_attn.clone()
@@ -276,12 +307,12 @@ class BertForRelationClassification(BertPreTrainedModel):
 						all_contexts = None
 						
 						for _ in range(num_of_attentive_tokens):
-							e1_attn_most_val = torch.max(e1_attn)
+							e1_attn_most_val = torch.max(e1_attn) # debug
 							e1_attn_most_idx = torch.argmax(e1_attn)
-							e2_attn_most_val = torch.max(e2_attn)
+							e2_attn_most_val = torch.max(e2_attn) # debug
 							e2_attn_most_idx = torch.argmax(e2_attn)
 							
-							e1_e2_attn_most_val = torch.max(torch.add(e1_attn, e2_attn))
+							e1_e2_attn_most_val = torch.max(torch.add(e1_attn, e2_attn)) # debug
 							e1_e2_attn_most_idx = torch.argmax(torch.add(e1_attn, e2_attn))
 							
 							# check if a token is a part of a split token.
@@ -385,6 +416,12 @@ class BertForRelationClassification(BertPreTrainedModel):
 						'''
 						
 					elif self.use_context == 'local':
+						# Get the min start index and max end index.
+						e1_start = torch.min(e1_span_idx_list, dim=0)[0][0]
+						e1_end = torch.max(e1_span_idx_list, dim=0)[0][1]
+						e2_start = torch.min(e2_span_idx_list, dim=0)[0][0]
+						e2_end = torch.max(e2_span_idx_list, dim=0)[0][1]
+
 						# if entity 1 appears before entity 2, and there is at least one token exists betweeen them.
 						if e1_end + lc_offset < e2_start - lc_offset:
 							context = sequence_output[i, e1_end+lc_offset:e2_start-lc_offset, :]

@@ -56,20 +56,23 @@ from sklearn.metrics import f1_score, accuracy_score, classification_report, rec
 #require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/text-classification/requirements.txt")
 
 
-dataset_list = ["ChemProt_BLURB", "DDI_BLURB", "GAD_BLURB", 
+dataset_list = ["ChemProt_BLURB", "DDI_BLURB", "GAD_BLURB", "EU-ADR_BioBERT",
 				"AImed", "BioInfer", "HPRD50", "IEPA", "LLL",
-				"Typed_PPI"]
+				"Typed_PPI",
+				"P-putida"]
 
 dataset_max_seq_length = {
 	#"ChemProt_BLURB": 256, # some samples (count: 11) are longer than 256 tokens.
 	#"DDI_BLURB": 256, # many samples are longer than 256 tokens. 
-	"GAD_BLURB": 128,
+	#"GAD_BLURB": 128, # some samples (count: 3) are longer than 128 tokens when BioBERT is used.
+	#"EU-ADR_BioBERT": 128, # some samples (count: 14) are longer than 128 tokens.
 }
 
 dataset_special_tokens = {
 	"ChemProt_BLURB": ["@GENE$", "@CHEMICAL$", "@CHEM-GENE$"],
 	"DDI_BLURB": ["@DRUG$", "@DRUG-DRUG$"],
 	"GAD_BLURB": ["@GENE$", "@DISEASE$"],
+	"EU-ADR_BioBERT": ["@GENE$", "@DISEASE$"],
 }
 
 entity_marker_special_tokens = {
@@ -419,7 +422,7 @@ def save_results(
 					  "recall": recall,
 					  "f1": f1,
 					  "accuracy": accuracy}
-				
+
 			with open(os.path.join(output_dir, data_name + '_' + task_name + '_result.txt'), 'a') as fp:
 				out_s = 'cv ' if do_cross_validation else ''
 				out_s += "set: {set:d} / accuracy: {accuracy:.4f} / precision: {precision:.4f} / recall: {recall:.4f} / f1: {f1:.4f}\n".format(set=dataset_num, accuracy=result['accuracy'], precision=result['precision'], recall=result['recall'], f1=result['f1'])
@@ -735,11 +738,16 @@ def main():
 			p_m = load_metric("precision")
 			r_m = load_metric("recall")
 			f_m = load_metric("f1")
-
+			
+			if any(x == dataset_name for x in ["GAD_BLURB", "EU-ADR_BioBERT"]):
+				average = "binary"
+			else:
+				average = "micro"
+			
 			a = a_m.compute(predictions=pred, references=true)
-			p = p_m.compute(predictions=pred, references=true, average="micro")
-			r = r_m.compute(predictions=pred, references=true, average="micro")
-			f = f_m.compute(predictions=pred, references=true, average="micro")
+			p = p_m.compute(predictions=pred, references=true, average=average)
+			r = r_m.compute(predictions=pred, references=true, average=average)
+			f = f_m.compute(predictions=pred, references=true, average=average)
 			
 			return {"accuracy": a["accuracy"], "precision": p["precision"], "recall": r["recall"], "f1": f["f1"]}
 		
@@ -749,7 +757,7 @@ def main():
 		# Remove old output files except the cross-validation result file.
 		if os.path.exists(training_args.output_dir):
 			for f in os.listdir(training_args.output_dir):
-				if os.path.isfile(os.path.join(training_args.output_dir, f)) and f != "cv_predict_results.json":
+				if os.path.isfile(os.path.join(training_args.output_dir, f)) and f != "predict_results_history.json":
 					os.remove(os.path.join(training_args.output_dir, f))
 			
 		# Get the number of datasets. If it's more than 1, it's a cross-validation dataset.
@@ -914,14 +922,7 @@ def main():
 			# this funct is used if the number of tokens in tokenizer is different from config.vocab_size.
 			model.resize_token_embeddings(len(tokenizer))
 
-			
-			
-			
-			
-			
-			
-			
-			
+
 			# Loading a dataset from your local files.
 			data_files = read_dataset(dataset_num, task_name, data_args)
 
@@ -934,6 +935,28 @@ def main():
 			print()
 			input('enter..')
 			'''
+			
+			# This is a temporary code.
+			# In BioInfer, some entities consist of separate tokens in a text, and the partial tokens are not properly tokenized by tokenizer.
+			# To avoid the mismatch between entity index from data file and entity index from tokenized output, add the partial tokens to the tokenzier
+			# so that the tokenizer properly catch partial tokens.
+			# E.g., "GP IIIa" in "GPIIb-IIIa", "MEK 2" in "MEK1/2"
+			if dataset_name == "BioInfer":
+				partial_token_list = []
+				for d in concatenate_datasets([data_files["train"], data_files["test"]]):
+					if len(d['relation'][0]['entity_1_idx']) > 1:
+						for (s, e) in d['relation'][0]['entity_1_idx']:
+							if d['text'][s-1] != ' ' or d['text'][e] != ' ':
+								partial_token = d['text'][s:e]
+								partial_token_list.extend(partial_token.split())
+
+				partial_token_list = list(set(partial_token_list))
+				tokenizer.add_tokens(partial_token_list)
+
+				# Resize input token embeddings matrix of the model since new tokens have been added.
+				# this funct is used if the number of tokens in tokenizer is different from config.vocab_size.
+				model.resize_token_embeddings(len(tokenizer))
+
 
 			dataset = featurize_data(data_files, tokenizer, padding, max_seq_length, relation_representation, use_entity_typed_marker)
 
@@ -1012,6 +1035,8 @@ def main():
 			datasets_dict = {} # used for save_misclassified_samples
 			
 			eval_info = {"dataset_num": dataset_num, 
+						 "seed": training_args.seed,
+						 "epoch": training_args.num_train_epochs,
 						 "per_device_train_batch_size": training_args.per_device_train_batch_size,
 						 "n_gpu": torch.cuda.device_count() if torch.cuda.is_available() else 0,
 						 "learning_rate": training_args.learning_rate,
@@ -1042,15 +1067,40 @@ def main():
 				trainer.save_metrics("predict", metrics, eval_info=eval_info)
 				
 				if data_args.save_predictions:
-					output_predict_file = os.path.join(training_args.output_dir, f"predict_results_{task_name}.txt")
+					output_predict_file = os.path.join(training_args.output_dir, f"predict_outputs.txt")
 					if trainer.is_world_process_zero():
 						predictions = np.argmax(predictions, axis=1)
-						with open(output_predict_file, "w") as writer:
-							logger.info(f"***** Predict results {task_name} *****")
-							writer.write("index\tprediction\n")
-							for index, item in enumerate(predictions):
+						with open(output_predict_file, "a") as writer:
+							logger.info(f"***** Predict outputs *****")
+							if os.path.getsize(output_predict_file) == 0:
+								writer.write("index\tentity_1\tentity_2\ttext\tprediction\tlabel\n")
+							for index, (sample, item, label) in enumerate(zip(test_dataset, predictions, labels)):
 								item = label_list[item]
-								writer.write(f"{index}\t{item}\n")
+								
+								# debug
+								if sample['labels'] != label:
+									raise Exception("Label mismatch!!")
+								
+								### TODO: for now, each sample has a single relation. Handle multiple relations in a sentence later.
+								label = label_list[label[0]]
+
+								input_ids = sample['input_ids']
+								sent = tokenizer.decode(input_ids)
+								sent = sent.replace('[CLS]', '').replace('[SEP]', '').strip()
+
+								def divide_chunks(l, n):
+									for i in range(0, len(l), n): 
+										yield l[i:i+n]
+								
+								### TODO: for now, each sample has a single relation. Handle multiple relations in a sentence later.
+								e1_span_idx_list, e2_span_idx_list = list(divide_chunks(sample['relations'], 2))[0]
+
+								e1 = ' '.join([tokenizer.decode(input_ids[s:e]) for s, e in e1_span_idx_list])
+								e2 = ' '.join([tokenizer.decode(input_ids[s:e]) for s, e in e2_span_idx_list])
+
+								writer.write(f"{index}\t{e1}\t{e2}\t{sent}\t{item}\t{label}\n")
+								
+
 
 			'''
 			# Prediction
@@ -1080,49 +1130,53 @@ def main():
 				print("Error: %s : %s" % (model_dir, e.strerror))
 			'''
 		
-		# Get average scores for CV datasets.
-		if num_of_datasets > 1:
-			result_file = os.path.join(training_args.output_dir, 'predict_results.json')
-			f = open(result_file)
-			
-			txt = ''
-			for line in f.readlines():
-				line = line.strip()
-				if line == '}{':
-					line = '}\n{'
-				txt += line
-			
-			txt = txt.split('\n')
-			
-			entries = [json.loads(x) for x in txt]
-			
-			result_data = {}
-			for entry in entries:
-				for k, v in entry.items():
-					if k in result_data:
-						result_data[k].append(v)
-					else:
-						result_data[k] = [v]
-			
-			out_data = {}
-			out_data["avg_predict_f1"] = float(np.mean(result_data["predict_f1"]))
-			out_data["avg_predict_precision"] = float(np.mean(result_data["predict_precision"]))
-			out_data["avg_predict_recall"] = float(np.mean(result_data["predict_recall"]))
-			out_data["avg_predict_accuracy"] = float(np.mean(result_data["predict_accuracy"]))
-			out_data["avg_predict_loss"] = float(np.mean(result_data["predict_loss"]))
-			out_data["learning_rate"] = str(result_data["learning_rate"][0])
-			out_data["per_device_train_batch_size"] = result_data["per_device_train_batch_size"][0]
-			out_data["warmup_ratio"] = result_data["warmup_ratio"][0]
-			out_data["weight_decay"] = result_data["weight_decay"][0]
-			out_data["n_gpu"] = result_data["n_gpu"][0]
-			
-			trainer.log_metrics(f"{num_of_datasets} folds cross-validation predict", out_data)
-			
-			out_file = os.path.join(training_args.output_dir, 'cv_predict_results.json')
-			with open(out_file, "a") as f:
-				json.dump(out_data, f, indent=4, sort_keys=True)
-	
+		# Save the prediction results in a history file.
+		result_file = os.path.join(training_args.output_dir, 'predict_results.json')
+		f = open(result_file)
 		
+		txt = ''
+		for line in f.readlines():
+			line = line.strip()
+			if line == '}{':
+				line = '}\n{'
+			txt += line
+		
+		txt = txt.split('\n')
+		
+		entries = [json.loads(x) for x in txt]
+		
+		result_data = {}
+		for entry in entries:
+			for k, v in entry.items():
+				if k in result_data:
+					result_data[k].append(v)
+				else:
+					result_data[k] = [v]
+		
+		out_data = {}
+		
+		# Add a predix for average scores of CV datasets.
+		key_prefix = "avg_" if num_of_datasets > 1 else ""
+		
+		out_data[key_prefix + "predict_f1"] = float(np.mean(result_data["predict_f1"]))
+		out_data[key_prefix + "predict_precision"] = float(np.mean(result_data["predict_precision"]))
+		out_data[key_prefix + "predict_recall"] = float(np.mean(result_data["predict_recall"]))
+		out_data[key_prefix + "predict_accuracy"] = float(np.mean(result_data["predict_accuracy"]))
+		out_data[key_prefix + "predict_loss"] = float(np.mean(result_data["predict_loss"]))
+		out_data["epoch"] = result_data["epoch"][0]
+		out_data["per_device_train_batch_size"] = result_data["per_device_train_batch_size"][0]
+		out_data["learning_rate"] = str(result_data["learning_rate"][0])
+		out_data["warmup_ratio"] = result_data["warmup_ratio"][0]
+		out_data["weight_decay"] = result_data["weight_decay"][0]
+		out_data["n_gpu"] = result_data["n_gpu"][0]
+		out_data["num_of_datasets"] = num_of_datasets
+		
+		if num_of_datasets > 1:
+			trainer.log_metrics(f"{num_of_datasets} folds cross-validation predict", out_data)
+		
+		out_file = os.path.join(training_args.output_dir, 'predict_results_history.json')
+		with open(out_file, "a") as f:
+			json.dump(out_data, f, indent=4, sort_keys=True)
 		
 		logger.info("*** Data iterations are done.  ***")
 		
