@@ -12,10 +12,11 @@ __pycache__/
 models/
 datasets/
 src/relation_extraction/backup/
-tests/fixtures/cached_*_text.txt
-logs/
-lightning_logs/
-lang_code_data/
+src/relation_extraction/optimize_model.py
+#tests/fixtures/cached_*_text.txt
+#logs/
+#lightning_logs/
+#lang_code_data/
 
 # Distribution / packaging
 .Python
