@@ -11,12 +11,15 @@ __pycache__/
 # tests and logs
 models/
 datasets/
+tests/
 src/relation_extraction/backup/
+src/relation_extraction/relation_type_data_parser/
 src/relation_extraction/data/tokenization_using_spacy/
 src/relation_extraction/optimize_model.py
+
+logs/
+lightning_logs/
 #tests/fixtures/cached_*_text.txt
-#logs/
-#lightning_logs/
 #lang_code_data/
 
 # Distribution / packaging

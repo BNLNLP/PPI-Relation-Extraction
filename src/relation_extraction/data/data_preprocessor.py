@@ -1,12 +1,13 @@
 import os
 from argparse import ArgumentParser
 
-data_converter_dict = {"ChemProt_BLURB": "datasets/conversion/convert_chemprot_blurb.py",
-                       "DDI_BLURB": "datasets/conversion/convert_ddi_blurb.py",
-                       "GAD_BLURB": "datasets/conversion/convert_gad_blurb.py",
-                       "EU-ADR_BioBERT": "datasets/conversion/convert_euadr_gad_biobert.py",
-                       "PPI": "datasets/conversion/convert_ppi.py",
-                       "GRR": "datasets/conversion/convert_grr.py"}
+
+data_converter_dict = {"ChemProt_BLURB": "src/relation_extraction/data/convert_chemprot_blurb.py",
+                       "DDI_BLURB": "src/relation_extraction/data/convert_ddi_blurb.py",
+                       "GAD_BLURB": "src/relation_extraction/data/convert_gad_blurb.py",
+                       "EU-ADR_BioBERT": "src/relation_extraction/data/convert_euadr_gad_biobert.py",
+                       "PPI": "src/relation_extraction/data/convert_ppi.py",
+                       "GRR": "src/relation_extraction/data/convert_grr.py"}
 
 def main():
     parser = ArgumentParser()
