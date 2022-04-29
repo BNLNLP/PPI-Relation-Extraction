@@ -2,7 +2,9 @@
 The project aims to build a Protein-Protein Interaction (PPI) extraction model based on Transformer architecture. 
 We used the five PPI benchmark datasets and three relation extraction (RE) datasets to evaluate our model.
 We provide the extended version of PPI datasets, called typed PPI, which have further augmented those positive/negative calls with own PPI role labels (structural or enzymatic). 
-(The model specifications and the annotated typed-PPI data will be released after a paper in preparation is published.)
+```diff
+-The model specifications and the annotated typed-PPI data will be released after a paper in preparation is published.
+```
 
 ## PPI benchmark data
 * AIMed (https://www.sciencedirect.com/science/article/pii/S0933365704001319)
