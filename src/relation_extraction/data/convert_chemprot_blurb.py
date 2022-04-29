@@ -90,7 +90,7 @@ for filename in os.listdir(data_dir):
             e2_s_in_text_with_entity_marker = text_with_entity_marker.index('[E2]') + len('[E2]')
             e2_e_in_text_with_entity_marker = text_with_entity_marker.index('[/E2]')
             
-            # don't use replace since two typed markers can be the same.
+            # don't use replace() since two typed markers can be the same.
             text_with_typed_entity_marker = text_with_typed_entity_marker[:e1_start] + \
                                             e1_typed_marker_s + entity_1 + e1_typed_marker_e + \
                                             text_with_typed_entity_marker[e1_end:e2_start] + \

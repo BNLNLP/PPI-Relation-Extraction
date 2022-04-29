@@ -5,7 +5,8 @@ import re
 from sklearn.metrics import f1_score, accuracy_score, classification_report, recall_score, precision_score, precision_recall_fscore_support
 
 
-output_file = "/hpcgpfs01/scratch/gpark/RE_results/GRR/P-putida/dmis-lab/biobert-base-cased-v1.1/STANDARD_mention_pooling_ac/predict_outputs.txt"
+#output_file = "/hpcgpfs01/scratch/gpark/RE_results/GRR/P-putida/dmis-lab/biobert-base-cased-v1.1/STANDARD_mention_pooling_ac/predict_outputs.txt"
+output_file = "/hpcgpfs01/scratch/gpark/RE_results/GRR/P-species/dmis-lab/biobert-base-cased-v1.1/STANDARD_mention_pooling_ac/predict_outputs.txt"
 
 pred, true = [], []
 pairs = []
@@ -21,12 +22,12 @@ for line in f.readlines()[1:]:
     e1 = data[1].lower().strip()
     e2 = data[2].lower().strip()
     
-    
+    '''
     if e1.startswith('pp') or e2.startswith('pp'):
         print(e1)
         print(e2)
         input('enter..')
-    
+    '''
     e1 = re.sub(r'[^a-zA-Z0-9]', '', e1)
     e2 = re.sub(r'[^a-zA-Z0-9]', '', e2)
     
@@ -51,7 +52,8 @@ print('<sklearn> f1:', f1) # this is the same as f1_score.
 print('<sklearn> accuracy:', accuracy)
 
 
-reg_precise_file = "/direct/sdcc+u/gpark/BER-NLP/RE/datasets/GRR/P-putida/Pputida.regulations.fixed.tsv"
+#reg_precise_file = "/direct/sdcc+u/gpark/BER-NLP/RE/datasets/GRR/P-putida/Pputida.regulations.fixed.tsv"
+reg_precise_file = "/direct/sdcc+u/gpark/BER-NLP/PPI-Relation-Extraction/datasets/GRR/P-species/Pseudomonas_genus.largest_species.regulations.tsv"
 
 f = open(reg_precise_file, "r")
 tsv_reader = csv.reader(f, delimiter="\t")
@@ -90,13 +92,14 @@ print(pairs)
 print(rp_pairs)
 print(intersection(pairs, rp_pairs))
 
+'''
 #fig_text = [x for x in texts if 'fig.' in x.lower() or 'figure' in x.lower()]
 fig_text = [x for x in texts if 'fig' in x.lower()]
 print(len(fig_text))
 
 for t in fig_text:
     print(t)
-
+'''
 
     
     

@@ -1289,10 +1289,10 @@ def split_and_save(doc_samples, output_dir, split_by_doc=False):
         samples = np.array(samples)
         labels = np.array(labels)
         
-        #kfold = StratifiedKFold(n_splits=10, shuffle=True)
-        #for fold_num, (train_index, test_index) in enumerate(kfold.split(samples, labels)):
-        kfold = KFold(n_splits=10, shuffle=True)
-        for fold_num, (train_index, test_index) in enumerate(kfold.split(samples)):
+        kfold = StratifiedKFold(n_splits=10, shuffle=True)
+        for fold_num, (train_index, test_index) in enumerate(kfold.split(samples, labels)):
+        #kfold = KFold(n_splits=10, shuffle=True)
+        #for fold_num, (train_index, test_index) in enumerate(kfold.split(samples)):
             train, test = samples[train_index], samples[test_index]
 
             #print("TRAIN len:", len(train_index), "TEST len:", len(test_index))
@@ -1315,7 +1315,8 @@ def main():
         data_file = data_file_dict[dataset_name]
         data_file = os.path.join(current_working_dir, data_file)
         doc_samples = get_samples_from_ppi_benchmark(data_file)
-        output_dir = data_file.rsplit('/', 1)[0] + '/10-fold-cv'
+        #output_dir = data_file.rsplit('/', 1)[0] + '/10-fold-cv'
+        output_dir = data_file.rsplit('/', 1)[0]
         split_and_save(doc_samples, output_dir)
     elif dataset_name in ["AImed_typed", "BioInfer_typed", "HPRD50_typed", "IEPA_typed", "LLL_typed"]:
         pos_data_file, neg_data_file = data_file_dict[dataset_name]

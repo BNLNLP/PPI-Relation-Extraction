@@ -223,6 +223,11 @@ class BertForRelationClassification(BertPreTrainedModel):
                     #e2_span_idx_list = e2_span_idx_list[e2_span_idx_list.eq(torch.tensor([-100, -100])) == False]
 
                     if self.relation_representation in ['EM_entity_start']:
+                        ## TODO: find a better way later.
+                        # Get the min start index.
+                        e1_start = torch.min(e1_span_idx_list, dim=0)[0][0]
+                        e2_start = torch.min(e2_span_idx_list, dim=0)[0][0]
+                        
                         e1_rep = sequence_output[i, e1_start-1, :]
                         e2_rep = sequence_output[i, e2_start-1, :]
                         
@@ -247,9 +252,32 @@ class BertForRelationClassification(BertPreTrainedModel):
                         all_e1_attn = None
                         for e1_start, e1_end in e1_span_idx_list:
                             e1_attn = attention_output[i,:,e1_start:e1_end,:]
+                            
+                            
+                            # debug
+                            #print(e1_attn.size())
+                            #print(e1_attn)
+                            #input('enter...')
+                            
+                            
                             all_e1_attn = torch.cat((all_e1_attn, e1_attn), dim=1) if all_e1_attn is not None else e1_attn
                         
-                        e1_attn = all_e1_attn.sum(0).sum(0)
+                        
+                        # debug
+                        '''
+                        print(all_e1_attn.sum(0).size())
+                        print(all_e1_attn.sum(0))
+                        print(all_e1_attn.sum(0).sum(0).size())
+                        print(all_e1_attn.sum(0).sum(0))
+                        tm = torch.max(all_e1_attn.sum(0), dim=0)[0]
+                        print(tm.size())
+                        print(tm)
+                        input('enter...')
+                        '''
+                        
+                        #e1_attn = all_e1_attn.sum(0).sum(0)
+                        e1_attn = torch.max(all_e1_attn.sum(0), dim=0)[0] # max_pooling
+                        #e1_attn = torch.mean(all_e1_attn.sum(0), dim=0) # mean_pooling
                         del all_e1_attn
                         
                         all_e2_attn = None
@@ -257,7 +285,9 @@ class BertForRelationClassification(BertPreTrainedModel):
                             e2_attn = attention_output[i,:,e2_start:e2_end,:]
                             all_e2_attn = torch.cat((all_e2_attn, e2_attn), dim=1) if all_e2_attn is not None else e2_attn
                         
-                        e2_attn = all_e2_attn.sum(0).sum(0)
+                        #e2_attn = all_e2_attn.sum(0).sum(0)
+                        e2_attn = torch.max(all_e2_attn.sum(0), dim=0)[0] # max_pooling
+                        #e2_attn = torch.mean(all_e2_attn.sum(0), dim=0) # mean_pooling
                         del all_e2_attn
 
                         # ref: https://discuss.pytorch.org/t/find-indices-of-a-tensor-satisfying-a-condition/80802
@@ -270,8 +300,9 @@ class BertForRelationClassification(BertPreTrainedModel):
                         # Ignore special tokens and tokens not having any alphanumeric character.
                         # Also, exclude entities.
                         tokens_to_ignore = [idx for idx, tok in enumerate(input_tokens) 
-                                            if tok in self.tokenizer.all_special_tokens or re.search('[a-zA-Z0-9]', tok) == None or 
-                                               (idx >= e1_start and idx < e1_end) or (idx >= e2_start and idx < e2_end)]
+                                                    if tok in self.tokenizer.all_special_tokens or 
+                                                       re.search('[a-zA-Z0-9]', tok) == None or 
+                                                       (idx >= e1_start and idx < e1_end) or (idx >= e2_start and idx < e2_end)]
                         
                         
                         '''
@@ -308,9 +339,9 @@ class BertForRelationClassification(BertPreTrainedModel):
                         
                         for _ in range(num_of_attentive_tokens):
                             e1_attn_most_val = torch.max(e1_attn) # debug
-                            e1_attn_most_idx = torch.argmax(e1_attn)
+                            e1_attn_most_idx = torch.argmax(e1_attn) # debug
                             e2_attn_most_val = torch.max(e2_attn) # debug
-                            e2_attn_most_idx = torch.argmax(e2_attn)
+                            e2_attn_most_idx = torch.argmax(e2_attn) # debug
                             
                             e1_e2_attn_most_val = torch.max(torch.add(e1_attn, e2_attn)) # debug
                             e1_e2_attn_most_idx = torch.argmax(torch.add(e1_attn, e2_attn))

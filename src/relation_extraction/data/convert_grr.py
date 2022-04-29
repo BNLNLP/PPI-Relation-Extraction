@@ -20,7 +20,9 @@ logger = logging.getLogger('__file__')
 
 current_working_dir = os.getcwd()
     
-data_file_dict = {"P-putida": "datasets/GRR/P-putida/curated_putitda_abstract_text.annot.1-600.json"}
+#data_file_dict = {"P-putida": "datasets/GRR/P-putida/curated_putitda_abstract_text.annot.1-1100.json"}
+#data_file_dict = {"P-putida": "datasets/GRR/P-aeruginosa & P-fluorescens/curated_positive_pairs_annot.json"}
+data_file_dict = {"P-putida": "datasets/GRR/P-species/combined_P-species_annot.json"}
 
 entity_type_file = os.path.join(current_working_dir, 'datasets/GRR/P-putida/entity_types.json')
 entity_types = json.load(open(entity_type_file))
@@ -92,7 +94,20 @@ def get_samples(file):
             text = item['orig']['sent_with_neighboring_text'] if neighboring_txt_needed else item['orig']['sent']
             sample_no = item['sample_no']
             doc_id = item['orig']['paper']
-
+            
+            
+            
+            
+            
+            
+            if text.startswith('The switch between the TCA cycle and glyoxylate shunt is controlled'):
+                continue
+            
+            
+            
+            
+            
+            
             # get a standardized relation form.
             for k, v in relation_type_dict.items():
                 if relation_type in v:
@@ -101,13 +116,14 @@ def get_samples(file):
 
             # debug
             if relation_type not in relation_types.keys():
-                print('Unknown relation - ', relation_type)
+                print('Unknown relation - ', relation_type, '/ sample_no:', sample_no)
+                input('enter..')
                 continue
 
             for g_p in gene_pairs:
                 # debug
                 if len(g_p) != 2:
-                    print(g_p)
+                    print('sample_no:', sample_no, '/ gene pair:', g_p)
                     input('enter..')
                     continue
                     
@@ -164,7 +180,7 @@ def get_samples(file):
                 
                 # debug
                 if len(e1_indice) == 0 or len(e2_indice) == 0:
-                    print('gene pair:', g_p)
+                    print('sample_no:', sample_no, '/ gene pair:', g_p)
                     print('e1_indice:', e1_indice, '| e2_indice:', e2_indice)
                     input('enter..')
                 
@@ -481,7 +497,8 @@ def main():
         data_file = data_file_dict[dataset_name]
         data_file = os.path.join(current_working_dir, data_file)
         doc_samples = get_samples(data_file)
-        output_dir = data_file.rsplit('/', 1)[0] + '/10-fold-cv'
+        #output_dir = data_file.rsplit('/', 1)[0] + '/10-fold-cv'
+        output_dir = data_file.rsplit('/', 1)[0]
         split_and_save(doc_samples, output_dir)
     else:
         sys.exit('Unknown data!!')

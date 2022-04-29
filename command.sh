@@ -13,13 +13,13 @@ do
             echo "you chose Pre-process datasets."
             
             # RE benchmark
-            export DATASET_NAME=ChemProt_BLURB
+            #export DATASET_NAME=ChemProt_BLURB
             #export DATASET_NAME=DDI_BLURB
             #export DATASET_NAME=GAD_BLURB
             #export DATASET_NAME=EU-ADR_BioBERT
             
             # PPI benchmark
-            #export DATASET_NAME=AImed
+            export DATASET_NAME=AImed
             #export DATASET_NAME=BioInfer
             #export DATASET_NAME=HPRD50
             #export DATASET_NAME=IEPA
@@ -34,6 +34,10 @@ do
             
             # GRR (Gene regulatory relation)
             #export DATASET_NAME=P-putida
+            
+            # INDRA
+            #export DATASET_NAME=INDRA
+            
             
             python ~/BER-NLP/PPI-Relation-Extraction/src/relation_extraction/data/data_preprocessor.py \
                 --dataset_name $DATASET_NAME
@@ -134,14 +138,14 @@ do
             export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/RE_results
             
             # RE benchmark
-            #export DATASET_NAME=ChemProt_BLURB
+            export DATASET_NAME=ChemProt_BLURB
             #export DATASET_NAME=DDI_BLURB
             #export DATASET_NAME=GAD_BLURB
             #export DATASET_NAME=EU-ADR_BioBERT
             
             # PPI benchmark
             #export DATASET_NAME=PPI/original/AImed
-            export DATASET_NAME=PPI/original/BioInfer
+            #export DATASET_NAME=PPI/original/BioInfer
             #export DATASET_NAME=PPI/original/HPRD50
             #export DATASET_NAME=PPI/original/IEPA
             #export DATASET_NAME=PPI/original/LLL
@@ -151,13 +155,14 @@ do
             
             # GRR (Gene regulatory relation)
             #export DATASET_NAME=GRR/P-putida
+            #export DATASET_NAME=GRR/P-species
 
             #srun -p volta -A nlp-sbu -t 24:00:00 -N 1 --gres=gpu:2 -J re \
             #srun -p voltadebug -A nlp-sbu -t 4:00:00 -N 1 --gres=gpu:2 -J re \
 
-            srun -p volta -A nlp-sbu -t 24:00:00 -N 1 --gres=gpu:2 -J re \
+            srun -p voltadebug -A nlp-sbu -t 4:00:00 -N 1 --gres=gpu:2 -J re \
             python ~/BER-NLP/PPI-Relation-Extraction/src/relation_extraction/run_re.py \
-                --model_list dmis-lab/biobert-base-cased-v1.1 \
+                --model_list dmis-lab/biobert-large-cased-v1.1 \
                 --task_name "re" \
                 --dataset_dir $DATASET_DIR \
                 --dataset_name $DATASET_NAME \
@@ -174,7 +179,7 @@ do
                 --learning_rate 1e-05 \
                 --warmup_ratio 0.0 \
                 --weight_decay 0.0 \
-                --relation_representation "STANDARD_mention_pooling" \
+                --relation_representation "EM_entity_start" \
                 --use_context "attn_based" \
                 --use_entity_type_embeddings False \
                 --overwrite_cache \

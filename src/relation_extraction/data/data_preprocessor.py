@@ -7,7 +7,8 @@ data_converter_dict = {"ChemProt_BLURB": "src/relation_extraction/data/convert_c
                        "GAD_BLURB": "src/relation_extraction/data/convert_gad_blurb.py",
                        "EU-ADR_BioBERT": "src/relation_extraction/data/convert_euadr_gad_biobert.py",
                        "PPI": "src/relation_extraction/data/convert_ppi.py",
-                       "GRR": "src/relation_extraction/data/convert_grr.py"}
+                       "GRR": "src/relation_extraction/data/convert_grr.py",
+                       "INDRA": "src/relation_extraction/data/convert_indra.py"}
 
 def main():
     parser = ArgumentParser()

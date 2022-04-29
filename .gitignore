@@ -11,11 +11,14 @@ __pycache__/
 # tests and logs
 models/
 datasets/
-tests/
+random_iter_scores/
+random_iter_command*.sh
+best_random_set_finder.py
 src/relation_extraction/backup/
 src/relation_extraction/relation_type_data_parser/
 src/relation_extraction/data/tokenization_using_spacy/
 src/relation_extraction/optimize_model.py
+src/relation_extraction/data/convert_indra.py
 
 logs/
 lightning_logs/

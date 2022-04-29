@@ -59,7 +59,7 @@ from sklearn.metrics import f1_score, accuracy_score, classification_report, rec
 dataset_list = ["ChemProt_BLURB", "DDI_BLURB", "GAD_BLURB", "EU-ADR_BioBERT",
                 "AImed", "BioInfer", "HPRD50", "IEPA", "LLL",
                 "Typed_PPI",
-                "P-putida"]
+                "P-putida", "P-species"]
 
 dataset_max_seq_length = {
     #"ChemProt_BLURB": 256, # some samples (count: 11) are longer than 256 tokens.
