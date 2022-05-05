@@ -63,8 +63,7 @@ class DataCollatorForRelationClassification:
             return_tensors="pt" if labels is None else None,
             #return_tensors=self.return_tensors,
         )
-        
-        
+
         label_max_length = max(map(len, batch["labels"]))
         
         
@@ -87,6 +86,35 @@ class DataCollatorForRelationClassification:
         if "entity_types" in batch:
             entity_types_max_length = max(map(len, batch["entity_types"]))
         # [END][GP] - padding 'entity_types' for relation classification 11-23-2021
+        
+        
+        # [START][GP] - padding 'tokens_seq' for relation classification. 05-03-2022
+        if "tokens_seq" in batch:
+            tokens_seq_max_length = max(map(len, batch["tokens_seq"]))
+        # [END][GP] - padding 'tokens_seq' for relation classification 05-03-2022
+
+
+        # [START][GP] - padding 'tokens_to_ignore' for relation classification. 05-03-2022
+        if "tokens_to_ignore" in batch:
+            tokens_to_ignore_max_length = max(map(len, batch["tokens_to_ignore"]))
+        # [END][GP] - padding 'tokens_to_ignore' for relation classification 05-03-2022
+
+
+        # [START][GP] - padding 'token_seq_idx_with_token_to_ignore_idx' for relation classification. 05-03-2022
+        #if "token_seq_idx_with_token_to_ignore_idx" in batch:
+        #    token_seq_idx_with_token_to_ignore_idx_max_length = max(map(len, batch["token_seq_idx_with_token_to_ignore_idx"]))
+        # [END][GP] - padding 'token_seq_idx_with_token_to_ignore_idx' for relation classification 05-03-2022
+
+        # [START][GP] - padding 'input_tokens' for relation classification. 05-02-2022
+        #if "input_tokens" in batch:
+        #    tokens_max_length = max(map(len, batch["input_tokens"]))
+        # [END][GP] - padding 'input_tokens' for relation classification. 05-02-2022
+
+        # [START][GP] - padding 'input_tokens' for relation classification. 05-02-2022
+        #if "test_ids" in batch:
+        #    test_ids_max_length = max(map(len, batch["test_ids"]))
+        # [END][GP] - padding 'input_tokens' for relation classification. 05-02-2022
+
 
         padding_side = self.tokenizer.padding_side
         if padding_side == "right":
@@ -114,23 +142,43 @@ class DataCollatorForRelationClassification:
             if "entity_types" in batch:
                 batch["entity_types"] = [entity_type + [self.label_pad_token_id] * (entity_types_max_length - len(entity_type)) for entity_type in batch["entity_types"]]
             # [END][GP] - padding 'entity_types' for relation classification 11-14-2021
+            
+            # [START][GP] - padding 'tokens_seq' for relation classification. 05-03-2022
+            if "tokens_seq" in batch:
+                batch["tokens_seq"] = [tokens_seq + [self.label_pad_token_id] * (tokens_seq_max_length - len(tokens_seq)) for tokens_seq in batch["tokens_seq"]]
+            # [END][GP] - padding 'tokens_seq' for relation classification 05-03-2022
+           
+            # [START][GP] - padding 'tokens_to_ignore' for relation classification. 05-03-2022
+            if "tokens_to_ignore" in batch:
+                batch["tokens_to_ignore"] = [tokens_to_ignore + [self.label_pad_token_id] * (tokens_to_ignore_max_length - len(tokens_to_ignore)) for tokens_to_ignore in batch["tokens_to_ignore"]]
+            # [END][GP] - padding 'tokens_to_ignore' for relation classification 05-03-2022
+           
+            # [START][GP] - padding 'token_seq_idx_with_token_to_ignore_idx' for relation classification. 05-03-2022
+            #if "token_seq_idx_with_token_to_ignore_idx" in batch:
+            #    batch["token_seq_idx_with_token_to_ignore_idx"] = [token_seq_idx_with_token_to_ignore_idx + [self.label_pad_token_id] * (token_seq_idx_with_token_to_ignore_idx_max_length - len(token_seq_idx_with_token_to_ignore_idx)) for token_seq_idx_with_token_to_ignore_idx in batch["token_seq_idx_with_token_to_ignore_idx"]]
+            # [END][GP] - padding 'token_seq_idx_with_token_to_ignore_idx' for relation classification 05-03-2022
+            
+            # [START][GP] - padding 'input_tokens' for relation classification. 05-02-2022
+            #if "input_tokens" in batch:
+            #    batch["input_tokens"] = [tokens + [self.tokenizer._pad_token] * (tokens_max_length - len(tokens)) for tokens in batch["input_tokens"]]
+            # [END][GP] - padding 'input_tokens' for relation classification. 05-02-2022
+            
+            # [START][GP] - padding 'input_tokens' for relation classification. 05-02-2022
+            #if "test_ids" in batch:
+            #    batch["test_ids"] = [tokens + [self.label_pad_token_id] * (test_ids_max_length - len(tokens)) for tokens in batch["test_ids"]]
+            # [END][GP] - padding 'input_tokens' for relation classification. 05-02-2022
+          
+          
         else:
             ### TODO: handle this case.
             pass
-        
 
         batch = {k: torch.tensor(v, dtype=torch.int64) for k, v in batch.items()}
-        
-        
-        # debug
-        '''
-        for k, v in batch.items():
-            print(k, v)
-            print(type(k))
-            print(type(v))
-        input('enter..')
-        '''
-            
-            
-        return batch
+        # [START][GP] - padding 'input_tokens' for relation classification. 05-02-2022
+        #import numpy as np
+        #batch = {k: torch.tensor([torch.tensor(x, dtype=torch.int64) for x in v[0]]) if k == "input_tokens" else torch.tensor(v, dtype=torch.int64) for k, v in batch.items()}
+        #batch = {k: torch.from_numpy(np.array(map(float, v[0]))) if k == "input_tokens" else torch.tensor(v, dtype=torch.int64) for k, v in batch.items()}
+        #batch = {k: v if k == "input_tokens" else torch.tensor(v, dtype=torch.int64) for k, v in batch.items()}
+        # [END][GP] - padding 'input_tokens' for relation classification. 05-02-2022
 
+        return batch

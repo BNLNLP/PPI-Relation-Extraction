@@ -9,15 +9,18 @@ from sklearn.metrics import f1_score, accuracy_score, classification_report, rec
 output_file = "/hpcgpfs01/scratch/gpark/RE_results/GRR/P-species/dmis-lab/biobert-base-cased-v1.1/STANDARD_mention_pooling_ac/predict_outputs.txt"
 
 pred, true = [], []
-pairs = []
+pairs = {}
 texts = set()
 
 f = open(output_file, "r")
 for line in f.readlines()[1:]:
     data = line.split('\t')
     
-    pred.append(data[4].strip())
-    true.append(data[5].strip())
+    p = data[4].strip()
+    t = data[5].strip()
+    
+    pred.append(p)
+    true.append(t)
     
     e1 = data[1].lower().strip()
     e2 = data[2].lower().strip()
@@ -31,11 +34,42 @@ for line in f.readlines()[1:]:
     e1 = re.sub(r'[^a-zA-Z0-9]', '', e1)
     e2 = re.sub(r'[^a-zA-Z0-9]', '', e2)
     
+    if e1.startswith('copz') or e1.startswith('copa'):
+        #print(e1)
+        e1 = re.sub(r'[0-9]', '', e1)
+        #print(e1 + '-' + e2)
+        #input('enter..')
     
+    if e2.startswith('copz') or e2.startswith('copa'):
+        #print(e2)
+        e2 = re.sub(r'[0-9]', '', e2)
+        #print(e2 + '-' + e1)
+        #input('enter..')
+        
+    if e1 == 'iscrsua':
+        e1 = ['iscr', 'iscs', 'iscu', 'isca']
+    else:
+        e1 = [e1]
     
-    pairs.append(e1 + '-' + e2)
-    pairs.append(e2 + '-' + e1)
+    if e2 == 'iscrsua':
+        e2 = ['iscr', 'iscs', 'iscu', 'isca']
+    else:
+        e2 = [e2]
     
+    for x in e1:
+        for y in e2:
+            k = x + '-' + y
+            if k in pairs:
+                pairs[k].append(p)
+            else:
+                pairs[k] = [p]
+                
+            k = y + '-' + x
+            if k in pairs:
+                pairs[k].append(p)
+            else:
+                pairs[k] = [p]
+
     texts.add(data[3])
 
 #f1score = f1_score(y_pred=pred, y_true=true, average='micro', labels=label_list)
@@ -65,10 +99,10 @@ rp_pairs = []
 
 output_txt = ''
 for row in tsv_reader:
-    regulator = row[0]
-    regulator_name = row[1]
-    regulatee = row[2]
-    regulatee_name = row[2]
+    regulator = row[1]
+    regulator_name = row[2]
+    regulatee = row[3]
+    regulatee_name = row[4]
     
     regulator = regulator.lower().strip()
     regulator_name = regulator_name.lower().strip()
@@ -85,12 +119,31 @@ for row in tsv_reader:
     rp_pairs.append(regulator_name + '-' + regulatee_name)
     rp_pairs.append(regulatee_name + '-' + regulator_name)
 
+
 def intersection(lst1, lst2):
     return list(set(lst1) & set(lst2))
 
-print(pairs)
-print(rp_pairs)
-print(intersection(pairs, rp_pairs))
+#print(pairs)
+#print(rp_pairs)
+print(intersection(list(pairs.keys()), rp_pairs))
+print(len(intersection(list(pairs.keys()), rp_pairs)))
+
+dup_checker = []
+rp_cnt = 0
+total_cnt = 0
+for no, i in enumerate(intersection(list(pairs.keys()), rp_pairs)):
+    if i not in dup_checker:
+        rp_cnt += 1
+        print(rp_cnt, i, len(pairs[i]), pairs[i])
+        total_cnt += len(pairs[i])
+        #input('enter..')
+        
+    dup_checker.append(i)
+    dup_checker.append(i.split('-')[1] + '-' + i.split('-')[0])
+    
+print(total_cnt) 
+    
+
 
 '''
 #fig_text = [x for x in texts if 'fig.' in x.lower() or 'figure' in x.lower()]

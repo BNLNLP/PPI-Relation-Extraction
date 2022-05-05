@@ -696,8 +696,24 @@ def get_samples_from_ppi_benchmark(file):
                 pair_e2 = pair_elem.get('e2')
                 pair_interaction = pair_elem.get('interaction')
                 
-                # Get the max start offset value for comparison.
-                if np.amax(entities[pair_e1]['offset_list'], axis=0)[0] < np.amax(entities[pair_e2]['offset_list'], axis=0)[0]:
+                # Get the min start offset value for comparison.
+                if np.amin(entities[pair_e1]['offset_list'], axis=0)[0] == np.amin(entities[pair_e2]['offset_list'], axis=0)[0]:
+                    # if start offsets are the same, set a shorter one as the first entity.
+                    if np.amin(entities[pair_e1]['offset_list'], axis=0)[1] < np.amin(entities[pair_e2]['offset_list'], axis=0)[1]:
+                        e1_offset_list = entities[pair_e1]['offset_list']
+                        e1_text = entities[pair_e1]['text']
+                        e1_type = entities[pair_e1]['type']
+                        e2_offset_list = entities[pair_e2]['offset_list']
+                        e2_text = entities[pair_e2]['text']
+                        e2_type = entities[pair_e2]['type']
+                    else:
+                        e1_offset_list = entities[pair_e2]['offset_list']
+                        e1_text = entities[pair_e2]['text']
+                        e1_type = entities[pair_e2]['type']
+                        e2_offset_list = entities[pair_e1]['offset_list']
+                        e2_text = entities[pair_e1]['text']
+                        e2_type = entities[pair_e1]['type']
+                elif np.amin(entities[pair_e1]['offset_list'], axis=0)[0] < np.amin(entities[pair_e2]['offset_list'], axis=0)[0]:
                     e1_offset_list = entities[pair_e1]['offset_list']
                     e1_text = entities[pair_e1]['text']
                     e1_type = entities[pair_e1]['type']
@@ -726,15 +742,22 @@ def get_samples_from_ppi_benchmark(file):
                 
                 # debug
                 if len(e1_offset_list) > 1 or len(e2_offset_list) > 1:
+                    e1_text = sent_txt[e1_start_idx:e1_end_idx]
+                    e2_text = sent_txt[e2_start_idx:e2_end_idx]
+                
+                # debug
+                if len(e1_offset_list) > 1 or len(e2_offset_list) > 1:
                     print(f'The separate entities: e1_offset_list {e1_offset_list}, e2_offset_list {e2_offset_list}')
                     num_of_separate_ent += 1
-                    
+                
+                # debug
                 if e1_start_idx == e2_start_idx or \
                    (e1_start_idx > e2_start_idx and e1_start_idx < e2_end_idx) or \
                    (e2_start_idx > e1_start_idx and e2_start_idx < e1_end_idx):
                     print(f'The overlapping entities: e1 {e1_start_idx, e1_end_idx}, e2 {e2_start_idx, e2_end_idx}')
                     num_of_overlapping_ent += 1
-
+                
+                '''
                 if e1_start_idx == e2_start_idx or \
                    (e1_start_idx > e2_start_idx and e1_start_idx < e2_end_idx) or \
                    (e2_start_idx > e1_start_idx and e2_start_idx < e1_end_idx) or \
@@ -752,71 +775,120 @@ def get_samples_from_ppi_benchmark(file):
                     e1_e_in_text_with_typed_entity_marker = -1
                     e2_s_in_text_with_typed_entity_marker = -1
                     e2_e_in_text_with_typed_entity_marker = -1
+                '''
+
+                # Add entity markers.
+                text_with_entity_marker = sent_txt
+
+                if e1_start_idx == e2_start_idx and e1_end_idx == e2_end_idx:
+                    e1_marker_s = e2_marker_s = '[E1-E2]'
+                    e1_marker_e = e2_marker_e = '[/E1-E2]'
                     
+                    e_text = e1_marker_s + e1_text + e1_marker_e
+
+                    #print('e1_text:', e1_text)                        
+                    #print('e2_text:', e2_text)                        
+                    #print(text_with_entity_marker)
+                    #input('enter..')
+
+                elif e1_start_idx == e2_start_idx:
+                    e1_marker_s = e2_marker_s = '[E1-E2]'
+                    e1_marker_e, e2_marker_e  = '[/E1]', '[/E2]'
+
+                    e_text = e1_marker_s + e1_text + e1_marker_e + e2_text[len(e1_text):] + e2_marker_e if len(e1_text) < len(e2_text) \
+                        else e1_marker_s + e2_text + e1_marker_e + e1_text[len(e2_text):] + e2_marker_e
+
+                    # update entity text with a marker appended. (debugging purpose)
+                    if len(e1_text) > len(e2_text):
+                        e1_text = e2_text + e1_marker_e + e1_text[len(e2_text):]
+                    else:
+                        e2_text = e1_text + e1_marker_e + e2_text[len(e1_text):]
+
+                elif e1_end_idx == e2_end_idx:
+                    e1_marker_s, e2_marker_s = '[E1]', '[E2]'
+                    e1_marker_e = e2_marker_e = '[/E1-E2]'
+
+                    e_text = e1_marker_s + e2_text[:-len(e1_text)] + e2_marker_s + e1_text + e2_marker_e if len(e1_text) < len(e2_text) \
+                        else e1_marker_s + e1_text[:-len(e2_text)] + e2_marker_s + e2_text + e2_marker_e
+                    
+                    # update entity text with a marker appended. (debugging purpose)
+                    if len(e1_text) > len(e2_text):
+                        e1_text = e1_text[:-len(e2_text)] + e2_marker_s + e2_text
+                    else:
+                        e2_text = e2_text[:-len(e1_text)] + e2_marker_s + e1_text
                 else:
-                    # Add entity markers.
-                    text_with_entity_marker = sent_txt
-                    text_with_typed_entity_marker = sent_txt
-                    
-                    e1_typed_marker_s, e1_typed_marker_e = '[' + e1_type + ']', '[/' + e1_type + ']'
-                    e2_typed_marker_s, e2_typed_marker_e = '[' + e2_type + ']', '[/' + e2_type + ']'
-                    
-                    # don't use replace since two entities are the same.
-                    text_with_entity_marker = text_with_entity_marker[:e1_start_idx] + \
-                                              '[E1]' + e1_text + '[/E1]' + \
-                                              text_with_entity_marker[e1_end_idx:e2_start_idx] + \
-                                              '[E2]' + e2_text + '[/E2]' + \
-                                              text_with_entity_marker[e2_end_idx:]
-                    
-                    e1_s_in_text_with_entity_marker = text_with_entity_marker.index('[E1]') + len('[E1]')
-                    e1_e_in_text_with_entity_marker = text_with_entity_marker.index('[/E1]')
-                    e2_s_in_text_with_entity_marker = text_with_entity_marker.index('[E2]') + len('[E2]')
-                    e2_e_in_text_with_entity_marker = text_with_entity_marker.index('[/E2]')
-                    
-                    text_with_typed_entity_marker = text_with_typed_entity_marker[:e1_start_idx] + \
-                                                    e1_typed_marker_s + e1_text + e1_typed_marker_e + \
-                                                    text_with_typed_entity_marker[e1_end_idx:e2_start_idx] + \
-                                                    e2_typed_marker_s + e2_text + e2_typed_marker_e + \
-                                                    text_with_typed_entity_marker[e2_end_idx:]
-                                           
-                    # Don't use index() because two typed markers can be the same.
-                    e1_s_in_text_with_typed_entity_marker = e1_start_idx + len(e1_typed_marker_s)
-                    e1_e_in_text_with_typed_entity_marker = e1_end_idx + len(e1_typed_marker_s)
-                    e2_s_in_text_with_typed_entity_marker = e2_start_idx + len(e1_typed_marker_s) + len(e1_typed_marker_e) + len(e2_typed_marker_s)
-                    e2_e_in_text_with_typed_entity_marker = e2_end_idx + len(e1_typed_marker_s) + len(e1_typed_marker_e) + len(e2_typed_marker_s)
-                        
-                    # debug
+                    e1_marker_s, e2_marker_s = '[E1]', '[E2]'
+                    e1_marker_e, e2_marker_e = '[/E1]', '[/E2]'
+                   
+                    e_text = e1_marker_s + e1_text + e1_marker_e + text_with_entity_marker[e1_end_idx:e2_start_idx] + \
+                             e2_marker_s + e2_text + e2_marker_e
+
+                # Don't use replace() since two entities can be identical.
+                text_with_entity_marker = text_with_entity_marker[:e1_start_idx] + \
+                                          e_text + \
+                                          text_with_entity_marker[e2_end_idx:]
+
+                e1_s_in_text_with_entity_marker = text_with_entity_marker.index(e1_marker_s) + len(e1_marker_s)
+                e1_e_in_text_with_entity_marker = text_with_entity_marker.index(e1_marker_e)
+                e2_s_in_text_with_entity_marker = text_with_entity_marker.index(e2_marker_s) + len(e2_marker_s)
+                e2_e_in_text_with_entity_marker = text_with_entity_marker.index(e2_marker_e)
+
+
+                # debug
+                if len(e1_offset_list) == 1 or len(e2_offset_list) == 1:
                     if e1_text != text_with_entity_marker[e1_s_in_text_with_entity_marker:e1_e_in_text_with_entity_marker] or \
-                       e1_text != text_with_typed_entity_marker[e1_s_in_text_with_typed_entity_marker:e1_e_in_text_with_typed_entity_marker] or \
-                       e2_text != text_with_entity_marker[e2_s_in_text_with_entity_marker:e2_e_in_text_with_entity_marker] or \
-                       e2_text != text_with_typed_entity_marker[e2_s_in_text_with_typed_entity_marker:e2_e_in_text_with_typed_entity_marker]:
-                        print('text:', text)
-                        print('e1_text:', e1_text, '/ e2_text:', e2_text)
-                        print('text_with_entity_marker:', text_with_entity_marker)
-                        print('e1_s_in_text_with_entity_marker:', e1_s_in_text_with_entity_marker, '/ e1_e_in_text_with_entity_marker:', e1_e_in_text_with_entity_marker)
-                        print('e2_s_in_text_with_entity_marker:', e2_s_in_text_with_entity_marker, '/ e2_e_in_text_with_entity_marker:', e2_e_in_text_with_entity_marker)
+                       e2_text != text_with_entity_marker[e2_s_in_text_with_entity_marker:e2_e_in_text_with_entity_marker]:
+                        print('>> sent_txt:', sent_txt)
+                        print('>> e1_text:', e1_text, '/ e2_text:', e2_text)
+                        print('>> text_with_entity_marker:', text_with_entity_marker)
+                        print('>> e1_s_in_text_with_entity_marker:', e1_s_in_text_with_entity_marker, '/ e1_e_in_text_with_entity_marker:', e1_e_in_text_with_entity_marker)
+                        print('>> e2_s_in_text_with_entity_marker:', e2_s_in_text_with_entity_marker, '/ e2_e_in_text_with_entity_marker:', e2_e_in_text_with_entity_marker)
                         print(text_with_entity_marker[e1_s_in_text_with_entity_marker:e1_e_in_text_with_entity_marker])
                         print(text_with_entity_marker[e2_s_in_text_with_entity_marker:e2_e_in_text_with_entity_marker])
-                        print('text_with_typed_entity_marker:', text_with_typed_entity_marker)
-                        print('e1_s_in_text_with_typed_entity_marker:', e1_s_in_text_with_typed_entity_marker, '/ e1_e_in_text_with_typed_entity_marker:', e1_e_in_text_with_typed_entity_marker)
-                        print('e2_s_in_text_with_typed_entity_marker:', e2_s_in_text_with_typed_entity_marker, '/ e2_e_in_text_with_typed_entity_marker:', e2_e_in_text_with_typed_entity_marker)
-                        print(text_with_typed_entity_marker[e1_s_in_text_with_typed_entity_marker:e1_e_in_text_with_typed_entity_marker])
-                        print(text_with_typed_entity_marker[e2_s_in_text_with_typed_entity_marker:e2_e_in_text_with_typed_entity_marker])
                         input('enter...')
-                    
+
+
+                ## TODO: handle typed entity markers later.
+                '''
+                text_with_typed_entity_marker = sent_txt
+
+                e1_typed_marker_s, e1_typed_marker_e = '[' + e1_type + ']', '[/' + e1_type + ']'
+                e2_typed_marker_s, e2_typed_marker_e = '[' + e2_type + ']', '[/' + e2_type + ']'
+
+                text_with_typed_entity_marker = text_with_typed_entity_marker[:e1_start_idx] + \
+                                                e1_typed_marker_s + e1_text + e1_typed_marker_e + \
+                                                text_with_typed_entity_marker[e1_end_idx:e2_start_idx] + \
+                                                e2_typed_marker_s + e2_text + e2_typed_marker_e + \
+                                                text_with_typed_entity_marker[e2_end_idx:]
+                                       
+                # Don't use index() because two typed markers can be identical.
+                e1_s_in_text_with_typed_entity_marker = e1_start_idx + len(e1_typed_marker_s)
+                e1_e_in_text_with_typed_entity_marker = e1_end_idx + len(e1_typed_marker_s)
+                e2_s_in_text_with_typed_entity_marker = e2_start_idx + len(e1_typed_marker_s) + len(e1_typed_marker_e) + len(e2_typed_marker_s)
+                e2_e_in_text_with_typed_entity_marker = e2_end_idx + len(e1_typed_marker_s) + len(e1_typed_marker_e) + len(e2_typed_marker_s)
+
+                if e1_text != text_with_typed_entity_marker[e1_s_in_text_with_typed_entity_marker:e1_e_in_text_with_typed_entity_marker] or \
+                   e2_text != text_with_typed_entity_marker[e2_s_in_text_with_typed_entity_marker:e2_e_in_text_with_typed_entity_marker]:
+                    print('text_with_typed_entity_marker:', text_with_typed_entity_marker)
+                    print('e1_s_in_text_with_typed_entity_marker:', e1_s_in_text_with_typed_entity_marker, '/ e1_e_in_text_with_typed_entity_marker:', e1_e_in_text_with_typed_entity_marker)
+                    print('e2_s_in_text_with_typed_entity_marker:', e2_s_in_text_with_typed_entity_marker, '/ e2_e_in_text_with_typed_entity_marker:', e2_e_in_text_with_typed_entity_marker)
+                    print(text_with_typed_entity_marker[e1_s_in_text_with_typed_entity_marker:e1_e_in_text_with_typed_entity_marker])
+                    print(text_with_typed_entity_marker[e2_s_in_text_with_typed_entity_marker:e2_e_in_text_with_typed_entity_marker])
+                    input('enter...')
+                '''
 
                 relation = {'relation_type': 'positive' if pair_interaction == 'True' else 'negative', 
                             'relation_id': 0 if pair_interaction == 'True' else 1,
-                            'entity_1': e1_text,
+                            'entity_1': e1_text, # not used in model just debugging purpose
                             'entity_1_idx': e1_offset_list,
                             'entity_1_idx_in_text_with_entity_marker': (e1_s_in_text_with_entity_marker, e1_e_in_text_with_entity_marker),
-                            'entity_1_idx_in_text_with_typed_entity_marker': (e1_s_in_text_with_typed_entity_marker, e1_e_in_text_with_typed_entity_marker),
+                            #'entity_1_idx_in_text_with_typed_entity_marker': (e1_s_in_text_with_typed_entity_marker, e1_e_in_text_with_typed_entity_marker),
                             'entity_1_type': e1_type,
                             'entity_1_type_id': entity_types[e1_type]['id'],
-                            'entity_2': e2_text,
+                            'entity_2': e2_text, # not used in model just debugging purpose
                             'entity_2_idx': e2_offset_list,
                             'entity_2_idx_in_text_with_entity_marker': (e2_s_in_text_with_entity_marker, e2_e_in_text_with_entity_marker),
-                            'entity_2_idx_in_text_with_typed_entity_marker': (e2_s_in_text_with_typed_entity_marker, e2_e_in_text_with_typed_entity_marker),
+                            #'entity_2_idx_in_text_with_typed_entity_marker': (e2_s_in_text_with_typed_entity_marker, e2_e_in_text_with_typed_entity_marker),
                             'entity_2_type': e2_type, 
                             'entity_2_type_id': entity_types[e2_type]['id']}
                 
@@ -828,7 +900,7 @@ def get_samples_from_ppi_benchmark(file):
                 sample = {"id": sent_id + '_' + pair_id,
                           "text": sent_txt,
                           "text_with_entity_marker": text_with_entity_marker,
-                          "text_with_typed_entity_marker": text_with_typed_entity_marker,
+                          #"text_with_typed_entity_marker": text_with_typed_entity_marker,
                           "relation": [relation],
                           "directed": False,
                           "reverse": False,
@@ -1198,7 +1270,7 @@ def store_data(train, dev, test, fold_num, output_dir):
         f.write(test_txt)
 
 
-def split_and_save(doc_samples, output_dir, split_by_doc=False):
+def split_and_save(doc_samples, output_dir, split_by_doc=True):
     doc_samples = {k: v for k, v in doc_samples.items() if len(v) > 0} # remove documents having no samples.
     
     if split_by_doc:
@@ -1289,10 +1361,10 @@ def split_and_save(doc_samples, output_dir, split_by_doc=False):
         samples = np.array(samples)
         labels = np.array(labels)
         
-        kfold = StratifiedKFold(n_splits=10, shuffle=True)
-        for fold_num, (train_index, test_index) in enumerate(kfold.split(samples, labels)):
-        #kfold = KFold(n_splits=10, shuffle=True)
-        #for fold_num, (train_index, test_index) in enumerate(kfold.split(samples)):
+        #kfold = StratifiedKFold(n_splits=10, shuffle=True)
+        #for fold_num, (train_index, test_index) in enumerate(kfold.split(samples, labels)):
+        kfold = KFold(n_splits=10, shuffle=True)
+        for fold_num, (train_index, test_index) in enumerate(kfold.split(samples)):
             train, test = samples[train_index], samples[test_index]
 
             #print("TRAIN len:", len(train_index), "TEST len:", len(test_index))

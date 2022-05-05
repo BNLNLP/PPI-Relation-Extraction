@@ -44,8 +44,6 @@ class BertForRelationClassification(BertPreTrainedModel):
         self.enable_predicate_span = False
         
         
-        
-        # used for debugging
         self.tokenizer = kwargs['tokenizer']
         
         if self.use_entity_type_embeddings:
@@ -119,6 +117,12 @@ class BertForRelationClassification(BertPreTrainedModel):
         relations=None,
         entity_types=None,
         predicates=None,
+        tokens_seq=None,
+        tokens_to_ignore=None,
+        #token_seq_idx_with_token_to_ignore_idx=None,
+        #input_tokens=None,
+        #test_ids=None,
+        
         
         directed=None,
         reverse=None,
@@ -177,6 +181,17 @@ class BertForRelationClassification(BertPreTrainedModel):
         input('enter...')
         '''
         
+        
+        # debug
+        #test_tokens = [x.split() for x in self.tokenizer.batch_decode(input_ids)]
+        #for x in self.tokenizer.batch_decode(input_ids):
+        #    print(x)
+        #    input('enter..')
+        
+        
+        
+        
+
         # offset used to find local context. In case of entity markers, ignore marker tokens for local context.
         # E.g., in the sample [E1] gene1 [/E1] activates [E2] gene2 [/E2], the local context should be just 'activates'.
         lc_offset = 1 if self.relation_representation.startswith('EM') else 0
@@ -249,19 +264,35 @@ class BertForRelationClassification(BertPreTrainedModel):
                         del all_e2_rep
 
                     if self.use_context == 'attn_based':
+                        
+                        
+                        
+                        ''' comparison test -> using entities performs better than using entity start markers. 04-29-2022
+                        if self.relation_representation in ['EM_entity_start']:
+                            # Get the min start index.
+                            e1_start = torch.min(e1_span_idx_list, dim=0)[0][0]
+                            e1_end = torch.max(e1_span_idx_list, dim=0)[0][1]
+                            e2_start = torch.min(e2_span_idx_list, dim=0)[0][0]
+                            e2_end = torch.max(e2_span_idx_list, dim=0)[0][1]
+
+                            e1_attn = attention_output[i,:,e1_start-1,:]
+                            e2_attn = attention_output[i,:,e2_start-1,:]
+
+                            e1_attn = e1_attn.sum(0)
+                            e2_attn = e2_attn.sum(0)
+                            
+                        else:
+                        ''' 
                         all_e1_attn = None
                         for e1_start, e1_end in e1_span_idx_list:
                             e1_attn = attention_output[i,:,e1_start:e1_end,:]
-                            
                             
                             # debug
                             #print(e1_attn.size())
                             #print(e1_attn)
                             #input('enter...')
                             
-                            
                             all_e1_attn = torch.cat((all_e1_attn, e1_attn), dim=1) if all_e1_attn is not None else e1_attn
-                        
                         
                         # debug
                         '''
@@ -274,7 +305,7 @@ class BertForRelationClassification(BertPreTrainedModel):
                         print(tm)
                         input('enter...')
                         '''
-                        
+
                         #e1_attn = all_e1_attn.sum(0).sum(0)
                         e1_attn = torch.max(all_e1_attn.sum(0), dim=0)[0] # max_pooling
                         #e1_attn = torch.mean(all_e1_attn.sum(0), dim=0) # mean_pooling
@@ -289,7 +320,14 @@ class BertForRelationClassification(BertPreTrainedModel):
                         e2_attn = torch.max(all_e2_attn.sum(0), dim=0)[0] # max_pooling
                         #e2_attn = torch.mean(all_e2_attn.sum(0), dim=0) # mean_pooling
                         del all_e2_attn
-
+                        
+                            
+                            
+                        
+                        
+                        
+                        ### [START] 1st approach
+                        """
                         # ref: https://discuss.pytorch.org/t/find-indices-of-a-tensor-satisfying-a-condition/80802
                         #b = input_ids[i] <= 4
                         #tokens_to_ignore = b.nonzero()
@@ -297,14 +335,14 @@ class BertForRelationClassification(BertPreTrainedModel):
 
                         input_tokens = self.tokenizer.convert_ids_to_tokens(input_ids[i])
                         
+                        
                         # Ignore special tokens and tokens not having any alphanumeric character.
                         # Also, exclude entities.
                         tokens_to_ignore = [idx for idx, tok in enumerate(input_tokens) 
                                                     if tok in self.tokenizer.all_special_tokens or 
                                                        re.search('[a-zA-Z0-9]', tok) == None or 
                                                        (idx >= e1_start and idx < e1_end) or (idx >= e2_start and idx < e2_end)]
-                        
-                        
+
                         '''
                         for x in tokens_to_ignore:
                             if (x >= e1_start and x < e1_end) or (x >= e2_start and x < e2_end):
@@ -314,17 +352,105 @@ class BertForRelationClassification(BertPreTrainedModel):
                                 print(input_ids[i])
                                 print(input_tokens)
                                 input('enter..')
-                        '''		
-                        
-                        
-                        
+                        '''
+
                         #target = torch.tensor(tokens_to_ignore)
                         #tmp_input = e1_attn.clone()
                         e1_attn[tokens_to_ignore] = float("-Inf")
                         e2_attn[tokens_to_ignore] = float("-Inf")
+                        """
+                        ### [END] 1st approach
+
+                        
+                        ### [START] 2nd approach
+                        """
+                        #print(self.tokenizer.all_special_tokens)
+                        #print(self.tokenizer.all_special_ids)
+                        
+                        input_tokens = self.tokenizer.convert_ids_to_tokens(input_ids[i])
+
+                        # debug
+                        #print(self.tokenizer.convert_ids_to_tokens(input_ids[i]))
+                        #print(input_tokens[i])
+                        #print(bool(self.tokenizer.convert_ids_to_tokens(input_ids[i]) == input_tokens[i]))
+                        
+                        #print(input_ids[i])
+                        #print(test_ids[i])
+                        #print(torch.equal(input_ids[i], test_ids[i]))
+                        #input('enter..')
+
+                        #tokens_to_ignore = [idx for idx, tok in enumerate(input_tokens) 
+                        #                            if tok in self.tokenizer.all_special_tokens or 
+                        #                               re.search('[a-zA-Z0-9]', tok) == None]
+                        
+                        nonalphanumeric_token_ids = [idx for idx, tok in enumerate(input_tokens) if re.search('[a-zA-Z0-9]', tok) == None]
+                        special_token_ids = torch.isin(input_ids[i], torch.tensor(self.tokenizer.all_special_ids, dtype=torch.int, device=sequence_output.device))
+                        
+                        e1_attn[nonalphanumeric_token_ids] = float("-Inf")
+                        e1_attn[special_token_ids] = float("-Inf")
+                        e1_attn[e1_start:e1_end] = float("-Inf")
+                        e1_attn[e2_start:e2_end] = float("-Inf")
+                        
+                        e2_attn[nonalphanumeric_token_ids] = float("-Inf")
+                        e2_attn[special_token_ids] = float("-Inf")
+                        e2_attn[e1_start:e1_end] = float("-Inf")
+                        e2_attn[e2_start:e2_end] = float("-Inf")
+
+                        '''
+                        tttt = torch.isin(input_ids[i], torch.tensor(self.tokenizer.all_special_ids, dtype=torch.int, device=sequence_output.device))
+                        
+                        
+                        tokens_to_ignore = [idx for idx, tok in enumerate(input_tokens) 
+                                                    if re.search('[a-zA-Z0-9]', tok) == None]
+
+                        ttt_attn[tokens_to_ignore] = float("-Inf") 
+                        ttt_attn[tttt] = float("-Inf") 
+                        ttt_attn[e1_start:e1_end] = float("-Inf")
+                        ttt_attn[e2_start:e2_end] = float("-Inf")
+                        
+                        print(e1_attn)
+                        print(ttt_attn)
+                        print(torch.equal(e1_attn, ttt_attn))
+                        
+                        
+                        print(tttt)
+                        
+                        print(tttt.nonzero(as_tuple=True)[0])
+                        
+                        b = input_ids[i] != self.tokenizer.all_special_ids
+                        print(b)
+                        tokens_to_ignore = b.nonzero()
+                        print(tokens_to_ignore)
+                        
+                        input('enter..')
+                        '''
+
+                        #print(test_attn)
+                        #print(e1_attn)
+                        #print(test_attn.size())
+                        #print(e1_attn.size())
+                        #print(torch.equal(e1_attn, test_attn))
+                        #input('enter...')
+                        """
+                        ### [END] 2nd approach
+
+
+                        ### [START] 3rd approach
+                        b = tokens_to_ignore[i] == -100
+
+                        e1_attn[b.nonzero()] = float("-Inf")
+                        e2_attn[b.nonzero()] = float("-Inf")
+
+                        ### [END] 3rd approach
+                        
+                        
+                        
+                        
+                        
                         
                         ### TODO: find the appropriate percentage.
-                        num_of_attentive_tokens = round(len([x for x in e1_attn if x != float("-Inf")])*0.2)
+                        #num_of_attentive_tokens = round(len([x for x in e1_attn if x != float("-Inf")])*0.2)
+                        num_of_attentive_tokens = torch.round((e1_attn != float("-Inf")).count_nonzero()*0.2)
                         
                         '''
                         print(round(len([x for x in e1_attn if x != float("-Inf")])))
@@ -337,15 +463,23 @@ class BertForRelationClassification(BertPreTrainedModel):
                         
                         all_contexts = None
                         
-                        for _ in range(num_of_attentive_tokens):
-                            e1_attn_most_val = torch.max(e1_attn) # debug
-                            e1_attn_most_idx = torch.argmax(e1_attn) # debug
-                            e2_attn_most_val = torch.max(e2_attn) # debug
-                            e2_attn_most_idx = torch.argmax(e2_attn) # debug
+                        ctx_tok_cnt = 0
+                        #while ctx_tok_cnt < num_of_attentive_tokens:
+                        for _ in range(num_of_attentive_tokens.int()):
+                            #e1_attn_most_val = torch.max(e1_attn) # debug
+                            #e1_attn_most_idx = torch.argmax(e1_attn) # debug
+                            #e2_attn_most_val = torch.max(e2_attn) # debug
+                            #e2_attn_most_idx = torch.argmax(e2_attn) # debug
+                            #e1_e2_attn_most_val = torch.max(torch.add(e1_attn, e2_attn)) # debug
                             
-                            e1_e2_attn_most_val = torch.max(torch.add(e1_attn, e2_attn)) # debug
+                            
+                            ### OPTION
                             e1_e2_attn_most_idx = torch.argmax(torch.add(e1_attn, e2_attn))
+                            #e1_e2_attn_most_idx = torch.argmax(torch.maximum(e1_attn, e2_attn))
+
                             
+                            ### [START] 1st approach
+                            """
                             # check if a token is a part of a split token.
                             if input_tokens[e1_e2_attn_most_idx].startswith('##') or input_tokens[e1_e2_attn_most_idx+1].startswith('##'):
                                                        
@@ -370,27 +504,24 @@ class BertForRelationClassification(BertPreTrainedModel):
                                 #   (input_tokens[e1_e2_attn_most_idx-1].startswith('##') and input_tokens[e1_e2_attn_most_idx].startswith('##')):
                                 print("all_special_tokens:", self.tokenizer.all_special_tokens)
                                 print("tokens_to_ignore:", tokens_to_ignore)
-                                print(e1_attn)
-                                print(e2_attn)
-                                print(e1_attn.size())
-                                print(e2_attn.size())
-                                print(e1_attn_most_val, e1_attn_most_idx)
-                                print(e2_attn_most_val, e2_attn_most_idx)
-                                print(e1_e2_attn_most_val, e1_e2_attn_most_idx)
-                            
-                                print(input_ids[i])
-                                print(input_tokens)
-                                print(input_tokens[e1_start])
-                                print(input_tokens[e2_start])
-                                print(input_tokens[e1_attn_most_idx])
-                                print(input_tokens[e2_attn_most_idx])
-                                print(input_tokens[e1_e2_attn_most_idx])
-                                print(input_tokens[word_s:word_e])
+                                print("e1_attn:", e1_attn)
+                                print("e2_attn:", e2_attn)
+                                print("e1_attn.size():", e1_attn.size())
+                                print("e2_attn.size():", e2_attn.size())
+                                print("input_ids:", input_ids[i])
+                                print("input_tokens:", input_tokens)
+                                print("e1_text:", input_tokens[e1_start:e1_end], "(" + str(e1_start.item()) + ", " + str(e1_end.item()) + ")")
+                                print("e2_text:", input_tokens[e2_start:e2_end], "(" + str(e2_start.item()) + ", " + str(e2_end.item()) + ")")
+                                print("input_tokens[e1_attn_most_idx]   :", input_tokens[e1_attn_most_idx], "(prob: " + str(round(e1_attn_most_val.item(), 2)) + ", idx: " + str(e1_attn_most_idx.item()) + ")")
+                                print("input_tokens[e2_attn_most_idx]   :", input_tokens[e2_attn_most_idx], "(prob: " + str(round(e2_attn_most_val.item(), 2)) + ", idx: " + str(e2_attn_most_idx.item()) + ")")
+                                print("input_tokens[e1_e2_attn_most_idx]:", input_tokens[e1_e2_attn_most_idx], "(prob: " + str(round(e1_e2_attn_most_val.item(), 2)) + ", idx: " + str(e1_e2_attn_most_idx.item()) + ")")
+                                print("attn_ctx_text:", input_tokens[word_s:word_e], "(" + str(word_s.item()) + ", " + str(word_e.item()) + ")")
                                 input('enter...')
                                 '''
                                 
                                 context = sequence_output[i, word_s:word_e, :]
                                 
+                                # debug
                                 '''
                                 print('sequence_output[i, word_s:word_e, :].size():', sequence_output[i, word_s:word_e, :].size())
                                 #print(sequence_output[i, word_s, :10])
@@ -402,20 +533,94 @@ class BertForRelationClassification(BertPreTrainedModel):
                                 e1_attn[word_s:word_e] = float("-Inf")
                                 e2_attn[word_s:word_e] = float("-Inf")
                                 
-                                
                             else:
-                                #context = sequence_output[i, e1_e2_attn_most_idx, :]
-                                # To match dimension with the case above. 
-                                context = sequence_output[i, e1_e2_attn_most_idx:e1_e2_attn_most_idx+1, :]
+                            """    
+                            ### [END] 1st approach
+                            
+                            ### [START] 3rd approach
+                            # check if a token is a part of a split token.
+                            if tokens_seq[i][e1_e2_attn_most_idx] == 1 or tokens_seq[i][e1_e2_attn_most_idx+1] == 1:
+                                                       
+                                def get_index(list, start, reverse=False):
+                                    step = -1 if reverse else 1
+                                    
+                                    #print(list)
+                                    
+                                    for ii, tt in enumerate(list[start::step]):
+                                        #print('ii:', ii, '/ tt:', tt)
+                                        if tt != 1:
+                                            break
+                                    
+                                    #print('start:', start)
+                                    #print('ii:', ii)
+
+                                    return start-ii if reverse else start+ii
+
+                                word_s = get_index(tokens_seq[i].tolist(), e1_e2_attn_most_idx, reverse=True) if tokens_seq[i][e1_e2_attn_most_idx] == 1 else e1_e2_attn_most_idx
+                                word_e = get_index(tokens_seq[i].tolist(), e1_e2_attn_most_idx+1, reverse=False)
                                 
-                                e1_attn[e1_e2_attn_most_idx] = float("-Inf")
-                                e2_attn[e1_e2_attn_most_idx] = float("-Inf")
+                                # debug
+                                '''
+                                #if (input_tokens[e1_e2_attn_most_idx].startswith('##') and input_tokens[e1_e2_attn_most_idx+1].startswith('##')) or \
+                                #   (input_tokens[e1_e2_attn_most_idx-1].startswith('##') and input_tokens[e1_e2_attn_most_idx].startswith('##')):
+                                print("all_special_tokens:", self.tokenizer.all_special_tokens)
+                                print("tokens_to_ignore:", tokens_to_ignore)
+                                print("e1_attn:", e1_attn)
+                                print("e2_attn:", e2_attn)
+                                print("e1_attn.size():", e1_attn.size())
+                                print("e2_attn.size():", e2_attn.size())
+                                print("input_ids:", input_ids[i])
+                                print("input_tokens:", input_tokens)
+                                print("e1_text:", input_tokens[e1_start:e1_end], "(" + str(e1_start.item()) + ", " + str(e1_end.item()) + ")")
+                                print("e2_text:", input_tokens[e2_start:e2_end], "(" + str(e2_start.item()) + ", " + str(e2_end.item()) + ")")
+                                print("input_tokens[e1_attn_most_idx]   :", input_tokens[e1_attn_most_idx], "(prob: " + str(round(e1_attn_most_val.item(), 2)) + ", idx: " + str(e1_attn_most_idx.item()) + ")")
+                                print("input_tokens[e2_attn_most_idx]   :", input_tokens[e2_attn_most_idx], "(prob: " + str(round(e2_attn_most_val.item(), 2)) + ", idx: " + str(e2_attn_most_idx.item()) + ")")
+                                print("input_tokens[e1_e2_attn_most_idx]:", input_tokens[e1_e2_attn_most_idx], "(prob: " + str(round(e1_e2_attn_most_val.item(), 2)) + ", idx: " + str(e1_e2_attn_most_idx.item()) + ")")
+                                print("attn_ctx_text:", input_tokens[word_s:word_e], "(" + str(word_s.item()) + ", " + str(word_e.item()) + ")")
+                                input('enter...')
+                                '''
+                                
+                                context = sequence_output[i, word_s:word_e, :]
+                                
+                                # debug
+                                '''
+                                print('sequence_output[i, word_s:word_e, :].size():', sequence_output[i, word_s:word_e, :].size())
+                                #print(sequence_output[i, word_s, :10])
+                                #print(sequence_output[i, word_e-1, :10])
+                                #print(context[:10])
+                                input('enter..')
+                                '''
+
+                            else:
+                            ### [END] 3rd approach
+
+                                #context = sequence_output[i, e1_e2_attn_most_idx, :]
+                                # To match dimension with the case above.
+                                word_s = e1_e2_attn_most_idx
+                                word_e = e1_e2_attn_most_idx+1
+                                context = sequence_output[i, word_s:word_e, :]
+ 
+                            e1_attn[word_s:word_e] = float("-Inf")
+                            e2_attn[word_s:word_e] = float("-Inf")
+
+                            ctx_tok_cnt += (word_e - word_s)
+                            
+                            
+                            #print(ctx_tok_cnt)
+                            #print(num_of_attentive_tokens)
+                            #input('enter..')
 
                             if all_contexts is None:
                                 all_contexts = context
                             else:
                                 all_contexts = torch.cat((all_contexts, context))
-                            #del context
+                            #del context                        
+                        
+                        
+                        #print('ctx_tok_cnt:', ctx_tok_cnt)
+                        #print('num_of_attentive_tokens:', num_of_attentive_tokens)
+                        #input('enter..')
+                        
                         
                         if all_contexts is None:
                             context = torch.zeros([self.hidden_size], dtype=sequence_output.dtype, device=sequence_output.device)

@@ -19,8 +19,8 @@ do
             #export DATASET_NAME=EU-ADR_BioBERT
             
             # PPI benchmark
-            export DATASET_NAME=AImed
-            #export DATASET_NAME=BioInfer
+            #export DATASET_NAME=AImed
+            export DATASET_NAME=BioInfer
             #export DATASET_NAME=HPRD50
             #export DATASET_NAME=IEPA
             #export DATASET_NAME=LLL
@@ -132,14 +132,14 @@ do
             #export TRAIN_DATA=~/RadBio/datasets/merged_samples/train_0.json
             #export TEST_DATA=~/RadBio/datasets/pputida_samples/pputida_samples.json
             #export TEST_DATA=~/RadBio/datasets/merged_samples/test_0.json
-            
+
 
             export DATASET_DIR=~/BER-NLP/PPI-Relation-Extraction/datasets
             export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/RE_results
             
             # RE benchmark
-            export DATASET_NAME=ChemProt_BLURB
-            #export DATASET_NAME=DDI_BLURB
+            #export DATASET_NAME=ChemProt_BLURB
+            export DATASET_NAME=DDI_BLURB
             #export DATASET_NAME=GAD_BLURB
             #export DATASET_NAME=EU-ADR_BioBERT
             
@@ -162,7 +162,7 @@ do
 
             srun -p voltadebug -A nlp-sbu -t 4:00:00 -N 1 --gres=gpu:2 -J re \
             python ~/BER-NLP/PPI-Relation-Extraction/src/relation_extraction/run_re.py \
-                --model_list dmis-lab/biobert-large-cased-v1.1 \
+                --model_list microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext \
                 --task_name "re" \
                 --dataset_dir $DATASET_DIR \
                 --dataset_name $DATASET_NAME \
@@ -176,14 +176,15 @@ do
                 --per_device_eval_batch_size 32 \
                 --num_train_epochs 10 \
                 --optim "adamw_torch" \
-                --learning_rate 1e-05 \
+                --learning_rate 5e-05 \
                 --warmup_ratio 0.0 \
                 --weight_decay 0.0 \
                 --relation_representation "EM_entity_start" \
                 --use_context "attn_based" \
                 --use_entity_type_embeddings False \
                 --overwrite_cache \
-                --overwrite_output_dir
+                --overwrite_output_dir \
+                --save_predictions
 
                 : '
                     --model_list bert-base-cased roberta-base allenai/biomed_roberta_base ~/BER-NLP/RE/RoBERTa-base-PM-M3-Voc-train-longer/RoBERTa-base-PM-M3-Voc-train-longer-hf \
@@ -229,7 +230,7 @@ do
                     --do_lower_case=False \ --> False (default)
                     --do_cross_validation \
                     --num_of_folds=10 \
-                    --relation_representation EM_entity_start \ -->  STANDARD_cls_token, STANDARD_mention_pooling, \
+                    --relation_representation EM_entity_start \ --> STANDARD_cls_token, STANDARD_mention_pooling, \
                                                                     EM_cls_token, EM_mention_pooling, EM_entity_start, \
                                                                     POSITIONAL_mention_pooling_plus_context \
                     --use_context "attn_based" \ --> None (default), "attn_based", "local"

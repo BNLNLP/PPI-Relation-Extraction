@@ -952,6 +952,15 @@ def tokenize_and_set_relation_labels(examples, tokenizer, padding, max_seq_lengt
     predicates = []
     entity_types = []
     
+    
+    tokens_seq = []
+    tokens_to_ignore = []
+    #token_seq_idx_with_token_to_ignore_idx = []
+    
+    #input_tokens = []
+    #test_ids = []
+    
+    
     # Most data has a single relation per example, but some data such as SciERC has multiple relations in a sentence.
     for i, rel_list in enumerate(examples['relation']):
         label_ids = []
@@ -991,6 +1000,7 @@ def tokenize_and_set_relation_labels(examples, tokenizer, padding, max_seq_lengt
                         e1_idx = rel['entity_1_idx_in_text_with_entity_marker']
                         e2_idx = rel['entity_2_idx_in_text_with_entity_marker']
                     
+                    ## TODO: remove this!! the first token is used for separate tokens.
                     if np.asarray(e1_idx).ndim > 1 or np.asarray(e2_idx).ndim > 1:
                         raise Exception("For now, entity marker representations do not support separate entities.")
                 else:
@@ -1057,8 +1067,9 @@ def tokenize_and_set_relation_labels(examples, tokenizer, padding, max_seq_lengt
             #predicate_spans.extend(predicates_info)
             ent_types.extend([entity_1_type_id, entity_2_type_id])
             
-            ## TODO: Add a debug condition for entities consisting of separate tokens. 
             # debug
+            '''
+            ## TODO: Add a debug condition for entities consisting of separate tokens. 
             if len(e1_span_idx_list) == 1 and len(e2_span_idx_list) == 1:
                 e1_old = examples[token_key][i][e1_s] if e1_s == e1_e else examples[token_key][i][e1_s:e1_e]
                 e2_old = examples[token_key][i][e2_s] if e2_s == e2_e else examples[token_key][i][e2_s:e2_e]
@@ -1079,16 +1090,140 @@ def tokenize_and_set_relation_labels(examples, tokenizer, padding, max_seq_lengt
                     print('e1_new:', re.sub(r'\s*', '', e1_new.lower()), '/ e2_new:', re.sub(r'\s*', '', e2_new.lower()))
                     print('len(e1_new):', len(re.sub(r'\s*', '', e1_new.lower())), '/ len(e2_new):', len(re.sub(r'\s*', '', e2_new.lower())))
                     input('enter..')
-            
+            '''
+
         labels.append(label_ids)
         relations.append(relation_spans)
         #predicates.append(predicate_spans)
         entity_types.append(ent_types)
+        #input_tokens.append(tokenized_inputs.tokens(batch_index=i))
+        #test_ids.append(tokenized_inputs['input_ids'][i])
+        
+              
+        tmp = []
+        input_tokens = tokenized_inputs.tokens(batch_index=i)
+        
+        entity_indice = []
+        for r_s in relation_spans:
+            for span_s, span_e in r_s:
+                entity_indice.extend(list(range(span_s, span_e)))
+        
+        entity_indice = list(set(entity_indice))
+        #print(relation_spans)
+        #print(entity_indice)
+        #print('------------')
+        #input('enter..')
+
+        tokens_seq.append([1 if tok.startswith('##') else 0 for tok in input_tokens])
+        tokens_to_ignore.append([-100 if re.search('[a-zA-Z0-9]', tok) == None or \
+                                         #tok in tokenizer.all_special_tokens or \
+                                         tok in list(set(tokenizer.all_special_tokens) - set(tokenizer.additional_special_tokens)) or \
+                                         idx in entity_indice \
+                                      else 0 for idx, tok in enumerate(input_tokens)])
+        
+        
+        """
+        nonalphanumeric_token_idx = []
+        
+        for idx, tok in enumerate(input_tokens):
+            if re.search('[a-zA-Z0-9]', tok) == None or \
+               tok in tokenizer.all_special_tokens or \
+               idx in entity_indice:
+                tmp.append(-100)
+            # middle/end token
+            elif input_tokens[idx].startswith('##'):
+                tmp.append(1)
+            # middle token
+            #elif input_tokens[idx].startswith('##') and input_tokens[idx+1].startswith('##'):
+            #    tmp.append(1)
+            # end token
+            #elif input_tokens[idx].startswith('##') and input_tokens[idx+1].startswith('##') == False:
+            #    tmp.append(2)
+            # start token
+            else:
+                tmp.append(0)
+            
+            
+            if re.search('[a-zA-Z0-9]', tok) == None:
+                if input_tokens[idx].startswith('##') or input_tokens[idx+1].startswith('##'):
+                                 
+                    def get_index(list, start, reverse=False):
+                        step = -1 if reverse else 1
+                        for ii, tt in enumerate(list[start::step]):
+                            #print('ii:', ii, '/ tt:', tt)
+                            if not tt.startswith('##'):
+                                break
+                        
+                        #print('start:', start)
+                        #print('ii:', ii)
+
+                        return start-ii if reverse else start+ii
+
+                    word_s = get_index(input_tokens, idx, reverse=True) if tok.startswith('##') else idx
+                    word_e = get_index(input_tokens, idx+1, reverse=False)
+                    
+                    # debug
+                    '''
+                    if tok.startswith('##'): 
+                        print(input_tokens)
+                        print(input_tokens[word_s:word_e])
+                        input('enter...')
+                    '''
+                    
+                    # check if the whole word is non-alphanumeric.
+                    if all(re.search('[a-zA-Z0-9]', t) == None for t in input_tokens[word_s:word_e]):
+                        nonalphanumeric_token_idx.append(idx)
+
+                else:
+                    nonalphanumeric_token_idx.append(idx)
+             
+             
+        tmp = [-100 if idx in set(nonalphanumeric_token_idx) else x for idx, x in enumerate(tmp)]
+        
+        token_seq_idx_with_token_to_ignore_idx.append(tmp)
+        """
+        
+        
+        '''
+        for idx, tok in enumerate(input_tokens):
+            print(idx, tok)
+        
+        for idx, tok in enumerate([1 if tok.startswith('##') else 0 for tok in input_tokens]):
+            print(idx, tok)        
+        
+        for idx, tok in enumerate([-100 if re.search('[a-zA-Z0-9]', tok) == None or \
+                                         tok in tokenizer.all_special_tokens or \
+                                         idx in entity_indice \
+                                      else 0 for idx, tok in enumerate(input_tokens)]):
+            print(idx, tok)      
+        
+
+        print(tokenizer.all_special_tokens)
+        
+        input('enter...')
+        '''
+        
+        
+        
+        
+        
+        
+        
+        
+        
     
     tokenized_inputs['labels'] = labels
     tokenized_inputs['relations'] = relations
     #tokenized_inputs['predicates'] = predicates
     tokenized_inputs['entity_types'] = entity_types
+    tokenized_inputs['tokens_seq'] = tokens_seq
+    tokenized_inputs['tokens_to_ignore'] = tokens_to_ignore
+    #tokenized_inputs['token_seq_idx_with_token_to_ignore_idx'] = token_seq_idx_with_token_to_ignore_idx
+    #tokenized_inputs['input_tokens'] = input_tokens
+    #tokenized_inputs['test_ids'] = test_ids
+    
+    
+    
     
     # debug
     '''
@@ -1102,12 +1237,13 @@ def tokenize_and_set_relation_labels(examples, tokenizer, padding, max_seq_lengt
     '''
     
     return tokenized_inputs
-    
-    
+
+
 def featurize_data(dataset, tokenizer, padding, max_seq_length, relation_representation, use_entity_typed_marker):
     convert_func_dict = tokenize_and_set_relation_labels
     #columns = ['input_ids', 'attention_mask', 'labels', 'token_type_ids', 'relations', 'predicates', 'entity_types', 'directed', 'reverse']
-    columns = ['input_ids', 'attention_mask', 'labels', 'token_type_ids', 'relations', 'entity_types']
+    columns = ['input_ids', 'attention_mask', 'labels', 'token_type_ids', 'relations', 'entity_types', 'tokens_seq', 'tokens_to_ignore']
+    #columns = ['input_ids', 'attention_mask', 'labels', 'token_type_ids', 'relations', 'entity_types', 'input_tokens', 'test_ids']
     
     # RoBERTa doesn't use NSP, so it doesn't need 'token_type_ids' which is segement IDs.
     if isinstance(tokenizer, RobertaTokenizerFast):

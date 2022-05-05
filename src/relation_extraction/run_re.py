@@ -844,16 +844,26 @@ def main():
             #
             # For some reason, add_tokens(special_tokens=True) doesn't update tokenizer.all_special_ids, tokenizer.all_special_tokens, ... 03/30/2022
             # Use add_special_tokens() instead.
+            additional_special_tokens = []
             if relation_representation.startswith('EM'):
-                additional_special_tokens = {"additional_special_tokens": entity_marker_special_tokens[dataset_name] if use_entity_typed_marker \
-                                                                          else entity_marker_special_tokens['EM']}
-                tokenizer.add_special_tokens(additional_special_tokens)
+                #additional_special_tokens = {"additional_special_tokens": entity_marker_special_tokens[dataset_name] if use_entity_typed_marker \
+                #                                                          else entity_marker_special_tokens['EM']}
+                additional_special_tokens.extend(entity_marker_special_tokens[dataset_name] if use_entity_typed_marker \
+                                                                                            else entity_marker_special_tokens['EM'])                                                              
+                #tokenizer.add_special_tokens(additional_special_tokens)
             
             # Add the special tokens that are used to replace entity names (entity anonymization or dummification). E.g,. ChemProt, DDI, GAD
             if dataset_name in dataset_special_tokens.keys():
-                additional_special_tokens = {"additional_special_tokens": dataset_special_tokens[dataset_name]}
-                tokenizer.add_special_tokens(additional_special_tokens)
-
+                #additional_special_tokens = {"additional_special_tokens": dataset_special_tokens[dataset_name]}
+                additional_special_tokens.extend(dataset_special_tokens[dataset_name])
+                
+                #tokenizer.add_special_tokens(additional_special_tokens)
+            
+            # Add additional special tokens at once. If they are added separately, then only tokens added later remain. 05/04/2022
+            if len(additional_special_tokens) > 0:
+                tokenizer.add_special_tokens({"additional_special_tokens": additional_special_tokens})
+            
+            
             # debugging
             '''
             #save_as_pickle("%s_tokenizer.pkl" % model_name, tokenizer_dict[task_name])
@@ -1130,54 +1140,55 @@ def main():
                 print("Error: %s : %s" % (model_dir, e.strerror))
             '''
         
-        # Save the prediction results in a history file.
-        result_file = os.path.join(training_args.output_dir, 'predict_results.json')
-        f = open(result_file)
-        
-        txt = ''
-        for line in f.readlines():
-            line = line.strip()
-            if line == '}{':
-                line = '}\n{'
-            txt += line
-        
-        txt = txt.split('\n')
-        
-        entries = [json.loads(x) for x in txt]
-        
-        result_data = {}
-        for entry in entries:
-            for k, v in entry.items():
-                if k in result_data:
-                    result_data[k].append(v)
-                else:
-                    result_data[k] = [v]
-        
-        out_data = {}
-        
-        # Add a predix for average scores of CV datasets.
-        key_prefix = "avg_" if num_of_datasets > 1 else ""
-        
-        out_data[key_prefix + "predict_f1"] = float(np.mean(result_data["predict_f1"]))
-        out_data[key_prefix + "predict_precision"] = float(np.mean(result_data["predict_precision"]))
-        out_data[key_prefix + "predict_recall"] = float(np.mean(result_data["predict_recall"]))
-        out_data[key_prefix + "predict_accuracy"] = float(np.mean(result_data["predict_accuracy"]))
-        out_data[key_prefix + "predict_loss"] = float(np.mean(result_data["predict_loss"]))
-        out_data["epoch"] = result_data["epoch"][0]
-        out_data["per_device_train_batch_size"] = result_data["per_device_train_batch_size"][0]
-        out_data["learning_rate"] = str(result_data["learning_rate"][0])
-        out_data["warmup_ratio"] = result_data["warmup_ratio"][0]
-        out_data["weight_decay"] = result_data["weight_decay"][0]
-        out_data["n_gpu"] = result_data["n_gpu"][0]
-        out_data["num_of_datasets"] = num_of_datasets
-        
-        if num_of_datasets > 1:
-            trainer.log_metrics(f"{num_of_datasets} folds cross-validation predict", out_data)
-        
-        out_file = os.path.join(training_args.output_dir, 'predict_results_history.json')
-        with open(out_file, "a") as f:
-            json.dump(out_data, f, indent=4, sort_keys=True)
-        
+        if training_args.do_predict:
+            # Save the prediction results in a history file.
+            result_file = os.path.join(training_args.output_dir, 'predict_results.json')
+            f = open(result_file)
+            
+            txt = ''
+            for line in f.readlines():
+                line = line.strip()
+                if line == '}{':
+                    line = '}\n{'
+                txt += line
+            
+            txt = txt.split('\n')
+            
+            entries = [json.loads(x) for x in txt]
+            
+            result_data = {}
+            for entry in entries:
+                for k, v in entry.items():
+                    if k in result_data:
+                        result_data[k].append(v)
+                    else:
+                        result_data[k] = [v]
+            
+            out_data = {}
+            
+            # Add a predix for average scores of CV datasets.
+            key_prefix = "avg_" if num_of_datasets > 1 else ""
+            
+            out_data[key_prefix + "predict_f1"] = float(np.mean(result_data["predict_f1"]))
+            out_data[key_prefix + "predict_precision"] = float(np.mean(result_data["predict_precision"]))
+            out_data[key_prefix + "predict_recall"] = float(np.mean(result_data["predict_recall"]))
+            out_data[key_prefix + "predict_accuracy"] = float(np.mean(result_data["predict_accuracy"]))
+            out_data[key_prefix + "predict_loss"] = float(np.mean(result_data["predict_loss"]))
+            out_data["epoch"] = result_data["epoch"][0]
+            out_data["per_device_train_batch_size"] = result_data["per_device_train_batch_size"][0]
+            out_data["learning_rate"] = str(result_data["learning_rate"][0])
+            out_data["warmup_ratio"] = result_data["warmup_ratio"][0]
+            out_data["weight_decay"] = result_data["weight_decay"][0]
+            out_data["n_gpu"] = result_data["n_gpu"][0]
+            out_data["num_of_datasets"] = num_of_datasets
+            
+            if num_of_datasets > 1:
+                trainer.log_metrics(f"{num_of_datasets} folds cross-validation predict", out_data)
+            
+            out_file = os.path.join(training_args.output_dir, 'predict_results_history.json')
+            with open(out_file, "a") as f:
+                json.dump(out_data, f, indent=4, sort_keys=True)
+            
         logger.info("*** Data iterations are done.  ***")
         
         '''
