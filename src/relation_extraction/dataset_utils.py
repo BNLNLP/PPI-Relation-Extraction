@@ -6,19 +6,30 @@ import json
 import pandas as pd
 import numpy as np
 from datasets import ClassLabel, load_dataset, load_metric, Dataset, DatasetDict, concatenate_datasets
-from transformers import DebertaV2Tokenizer
-
 from transformers import BertTokenizerFast, RobertaTokenizerFast
-
-import spacy
-from spacy.symbols import ORTH
-nlp = spacy.load("en_core_web_sm", disable=["tagger", "ner"])
 
 import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def read_dataset(dataset_num=0, task_name=None, data_args=None):
+    data_files = {}
+    if data_args.train_file is not None and data_args.test_file is not None:
+        data_files["train"] = data_args.train_file
+        data_files["test"] = data_args.test_file
+    else:
+        data_dir = os.path.join(data_args.dataset_dir, data_args.dataset_name)
+        data_files["train"] = os.path.join(data_dir, 'train_' + str(dataset_num) + '.json')
+        data_files["test"] = os.path.join(data_dir, 'test_' + str(dataset_num) + '.json')
+        if os.path.isfile(os.path.join(data_dir, 'dev_' + str(dataset_num) + '.json')):
+            data_files["validation"] = os.path.join(data_dir, 'dev_' + str(dataset_num) + '.json')
+            
+    extension = data_files["train"].split(".")[-1]
+    
+    return load_dataset(extension, data_files=data_files)
+    
+    
 def tokenize_and_set_relation_labels(examples, tokenizer, padding, max_seq_length, relation_representation, use_entity_typed_marker, use_context):
 
     if 'text' in examples:

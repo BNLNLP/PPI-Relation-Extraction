@@ -32,8 +32,10 @@ do
             
             #srun -p voltadebug -A nlp-sbu -t 24:00:00 -N 1 --gres=gpu:2 -J re \
             
-            srun -p volta -A nlp-sbu -t 24:00:00 -N 1 --gres=gpu:2 -J re \			
-            python ~/BER-NLP/PPI-Relation-Extraction/src/relation_extraction/run_re.py \
+            #srun -p volta -A nlp-sbu -t 24:00:00 -N 1 --gres=gpu:2 -J re \			
+            
+			
+			python ~/BER-NLP/PPI-Relation-Extraction/src/relation_extraction/run_re.py \
                 --model_list dmis-lab/biobert-base-cased-v1.1 \
                 --task_name "re" \
                 --dataset_dir $DATASET_DIR \

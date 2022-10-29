@@ -40,7 +40,7 @@ from transformers.trainer_utils import get_last_checkpoint, is_main_process
 from transformers.utils import check_min_version
 
 from dataset_utils import *
-from model import BertForRelationClassification, RobertaForRelationClassification
+from model import BertForRelationClassification
 from data_collator import DataCollatorForRelationClassification
 
 ### TODO: remove this if not used.
