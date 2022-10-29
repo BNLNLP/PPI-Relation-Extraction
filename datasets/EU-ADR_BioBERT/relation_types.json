@@ -1,0 +1,10 @@
+{
+	"negative": {
+		"id": 0,
+		"directed": true
+	},
+	"positive": {
+		"id": 1,
+		"directed": true
+	}
+}

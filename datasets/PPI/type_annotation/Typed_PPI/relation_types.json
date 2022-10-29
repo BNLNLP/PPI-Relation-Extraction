@@ -1,0 +1,15 @@
+{
+	"enzyme": {
+        "id": 0,
+        "directed": false
+    },
+	"structural": {
+        "id": 1,
+        "directed": false
+    },
+	"negative": {
+        "id": 2,
+        "directed": false
+    }
+}
+

@@ -1,0 +1,72 @@
+# ChemProt - the pre-trained model: BioBERT-large
+{
+    "seed": 1,
+    "epoch": 10.0,
+    "learning_rate": 1e-05,
+    "n_gpu": 2,
+    "num_of_datasets": 1,
+    "per_device_train_batch_size": 8,
+    "warmup_ratio": 0.0,
+    "weight_decay": 0.0
+}
+
+# DDI - the pre-trained model: PubMedBERT-fulltext
+{
+    "seed": 1,
+    "epoch": 10.0,
+    "learning_rate": 3e-05,
+    "n_gpu": 2,
+    "num_of_datasets": 1,
+    "per_device_train_batch_size": 8,
+    "warmup_ratio": 0.0,
+    "weight_decay": 0.0
+}
+
+# GAD - the pre-trained model: PubMedBERT-fulltext
+{
+    "seed": 1,
+    "epoch": 3.0,
+    "learning_rate": "1e-05",
+    "n_gpu": 2,
+    "num_of_datasets": 1,
+    "per_device_train_batch_size": 4,
+    "warmup_ratio": 0.0,
+    "weight_decay": 0.0
+}
+
+# EU-ADR - the pre-trained model: BioBERT-base
+{
+    "seed": 1,
+    "epoch": 3.0,
+    "learning_rate": "1e-05",
+    "n_gpu": 2,
+    "num_of_datasets": 10,
+    "per_device_train_batch_size": 4,
+    "warmup_ratio": 0.0,
+    "weight_decay": 0.0
+}
+
+# PPI (AIMed, BioInfer) - the pre-trained model: BioBERT-base
+{
+    "seed": 1,
+    "epoch": 10.0,
+    "learning_rate": "5e-05",
+    "n_gpu": 2,
+    "num_of_datasets": 10,
+    "per_device_train_batch_size": 16,
+    "warmup_ratio": 0.0,
+    "weight_decay": 0.0
+}
+
+# PPI (HPRD50, IEPA, LLL)- the pre-trained model: BioBERT-base
+{
+    "seed": 1,
+    "epoch": 10.0,
+    "learning_rate": "5e-05",
+    "n_gpu": 2,
+    "num_of_datasets": 10,
+    "per_device_train_batch_size": 8,
+    "warmup_ratio": 0.0,
+    "weight_decay": 0.0
+}
+

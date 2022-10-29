@@ -1,0 +1,17 @@
+{
+	"DRUG": {
+		"id": 0
+	},	
+	"BRAND": {
+		"id": 1
+	},
+	"GROUP": {
+		"id": 2
+	},
+	"DRUG_N": {
+		"id": 3
+	},
+	"DRUG_DRUG": {
+		"id": 4
+	}
+}

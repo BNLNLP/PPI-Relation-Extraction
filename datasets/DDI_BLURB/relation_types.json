@@ -1,0 +1,22 @@
+{
+	"DDI-false": {
+		"id": 0,
+		"directed": true
+	},	
+	"DDI-advise": {
+		"id": 1,
+		"directed": true
+	},
+	"DDI-effect": {
+		"id": 2,
+		"directed": true
+	},
+	"DDI-int": {
+		"id": 3,
+		"directed": true
+	},
+	"DDI-mechanism": {
+		"id": 4,
+		"directed": true
+	}
+}

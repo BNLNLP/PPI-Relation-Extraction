@@ -1,0 +1,11 @@
+{
+	"agent": {
+		"id": 0
+	},
+	"target": {
+		"id": 1
+	},
+	"agent/target": {
+		"id": 2
+	}
+}

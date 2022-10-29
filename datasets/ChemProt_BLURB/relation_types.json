@@ -1,0 +1,26 @@
+{
+	"CPR:false": {
+		"id": 0,
+		"directed": true
+	},
+	"CPR:3": {
+		"id": 1,
+		"directed": true
+	},
+	"CPR:4": {
+		"id": 2,
+		"directed": true
+	},
+	"CPR:5": {
+		"id": 3,
+		"directed": true
+	},
+	"CPR:6": {
+		"id": 4,
+		"directed": true
+	},
+	"CPR:9": {
+		"id": 5,
+		"directed": true
+	}
+}

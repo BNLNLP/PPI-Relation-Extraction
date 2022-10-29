@@ -37,8 +37,3 @@ class RelationClassifierOutput(ModelOutput):
     hidden_states: Optional[Tuple[torch.FloatTensor]] = None
     attentions: Optional[Tuple[torch.FloatTensor]] = None
     
-    ### TODO: this is used in Training in ver 4.12.0. remove this after test.
-    # [START][GP] - return ppi_labels for PPI classification in the joint learning. 10-01-2021
-    #ppi_labels: torch.FloatTensor = None
-    # [END][GP] - return ppi_labels for PPI classification in the joint learning. 10-01-2021
-    

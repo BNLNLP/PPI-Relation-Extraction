@@ -1,0 +1,11 @@
+{
+	"GENE": {
+		"id": 0
+	},
+	"CHEMICAL": {
+		"id": 1
+	},
+	"CHEM-GENE": {
+		"id": 2
+	}
+}

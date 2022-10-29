@@ -297,244 +297,6 @@ class DataTrainingArguments:
                 assert extension == "json", "`test_file` should be a json file."
 
 
-#
-def save_results(
-    results_dict, 
-    data_list, 
-    task_name, 
-    label_list, 
-    output_dir,
-    do_cross_validation, 
-    save_misclassified_samples,
-):
-    
-    if do_cross_validation:
-        all_results_per_data_and_task = {}
-        for data_name in data_list: # eval or pred
-            all_results_per_data_and_task[data_name][task_name] = {'accuracy': [], 'precision': [], 'recall': [], 'f1': []}
-
-    if save_misclassified_samples:
-        miscls_samples_per_data_and_task = {}
-        for data_name in data_list: # eval or pred
-            miscls_samples_per_data_and_task[data_name][task_name] = {}
-    
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    for dataset_num, results in results_dict.items():
-        for result in results:
-            data_name = result['data_name'] # eval or pred
-            prediction_output = result['prediction_output']
-            datasets = result['datasets']
-            tokenizer = result['tokenizer']						  
-
-            predictions, labels = prediction_output.predictions, prediction_output.label_ids
-            
-            '''
-            print(predictions)
-            print(labels)
-            print(predictions.shape)
-            print(labels.shape)
-            '''
-            
-            #predictions = np.argmax(predictions, axis=2)
-            predictions = np.argmax(predictions, axis=1)
-            labels = labels.flatten()
-            
-            '''
-            print(predictions)
-            print(labels)
-            print(predictions.shape)
-            print(labels.shape)
-            #input('enter..')
-            '''
-            
-            pred = [label_list[x] for x in predictions]
-            true = [label_list[x] for x in labels]
-            
-            
-            # Remove ignored index (special tokens)
-            '''
-            true_predictions = [
-                [task_label_list[p] for (p, l) in zip(prediction, label) if l != -100]
-                for prediction, label in zip(predictions, labels)
-            ]
-            true_labels = [
-                [task_label_list[l] for (p, l) in zip(prediction, label) if l != -100]
-                for prediction, label in zip(predictions, labels)
-            ]
-            '''
-            
-            # debug
-            '''
-            print(task_name, pred_output.predictions)
-            print(task_name, pred_output.predictions.shape)
-            print(task_name, pred_output.predictions[:, :true_label_len, :])
-            print(task_name, pred_output.predictions[:, :true_label_len, :].shape)
-            print(task_name, pred_output.label_ids)
-            print(task_name, pred_output.label_ids.shape)
-            input('enter..')
-            '''
-
-            
-            if 'DDI-false' in label_list: # for DDI, ignore 'DDI-false' label.
-                cleaned_pred_labels = []
-                for i in pred:
-                    if i == 'DDI-false':
-                        cleaned_pred_labels.append('false')
-                    else:
-                        cleaned_pred_labels.append(i)
-                pred = cleaned_pred_labels
-                label_list.remove('DDI-false')
-            elif 'no_relation' in label_list: # for TACRED, ignore 'no_relation' label.
-                cleaned_pred_labels = []
-                for i in pred:
-                    if i == 'no_relation':
-                        cleaned_pred_labels.append('false')
-                    else:
-                        cleaned_pred_labels.append(i)
-                pred = cleaned_pred_labels
-                label_list.remove('no_relation')
-
-            # debug
-            '''
-            with open(os.path.join(output_dir, data_name + '_' + task_name + '_pred_labels.txt'), 'a') as fp:
-                for element in predictions:
-                    fp.write(element + "\n")
-            with open(os.path.join(output_dir, data_name + '_' + task_name + '_actual_labels.txt'), 'a') as fp:
-                for element in true:
-                    fp.write(element + "\n")
-            '''
-
-            #f1score = f1_score(y_pred=pred, y_true=true, average='micro', labels=label_list)
-            precision, recall, f1, _ = precision_recall_fscore_support(y_pred=pred, y_true=true, \
-                                                                       labels=label_list, average='micro')
-            accuracy = accuracy_score(true, pred) # TODO: ignore 'DDI-false' for DDI evaluation.
-            
-            print("<sklearn> - classification_report")
-            print(classification_report(true, pred, digits=4, labels=label_list))
-            print('<sklearn> precision:', precision)
-            print('<sklearn> recall:', recall)
-            print('<sklearn> f1:', f1) # this is the same as f1_score.
-            print('<sklearn> accuracy:', accuracy)
-
-            result = {"precision": precision, 
-                      "recall": recall,
-                      "f1": f1,
-                      "accuracy": accuracy}
-
-            with open(os.path.join(output_dir, data_name + '_' + task_name + '_result.txt'), 'a') as fp:
-                out_s = 'cv ' if do_cross_validation else ''
-                out_s += "set: {set:d} / accuracy: {accuracy:.4f} / precision: {precision:.4f} / recall: {recall:.4f} / f1: {f1:.4f}\n".format(set=dataset_num, accuracy=result['accuracy'], precision=result['precision'], recall=result['recall'], f1=result['f1'])
-
-                fp.write(out_s + '--------------------------\n')
-                
-            if do_cross_validation:
-                all_results_per_data_and_task[data_name][task_name]['accuracy'].append(result['accuracy'])
-                all_results_per_data_and_task[data_name][task_name]['precision'].append(result['precision'])
-                all_results_per_data_and_task[data_name][task_name]['recall'].append(result['recall'])
-                all_results_per_data_and_task[data_name][task_name]['f1'].append(result['f1'])
-            
-                
-            
-            ### TODO: fix this!!
-            if save_misclassified_samples:
-                #miscls_indices = [pred.index(y) for x, y in zip(true, pred) if y != x]
-                #miscls_sent = [datasets_dict[task_name][i]['input_ids'] for i in miscls_indices]
-                #miscls_sent = [tokenizer_dict[task_name].decode(i) for i in miscls_sent]
-
-                #print('len(pred):', len(pred))
-                #print('len(true):', len(true))
-                
-
-                for idx, (p_labels, t_labels) in enumerate(zip(pred, true)):
-                    input_ids = datasets_dict[task_name][idx]['input_ids']
-                    miscls_sent = tokenizer_dict[task_name].decode(input_ids)
-                    miscls_sent = miscls_sent.replace('[CLS]', '').replace('[SEP]', '').strip()
-                    
-                    def divide_chunks(l, n):
-                        for i in range(0, len(l), n): 
-                            yield l[i:i + n]
-                            
-                    rels = list(divide_chunks(datasets_dict[task_name][idx]['relations'], 5))
-                    
-                    
-                    '''
-                    #for tt in datasets_dict[task_name][idx]:
-                    #	print(tt)
-
-                    print(len(p_labels))
-                    print(len(t_labels))
-                    print(len(rels))
-                    print(p_labels)
-                    print(t_labels)
-                    print(rels)
-                    print(datasets_dict[task_name][idx]['input_ids'])
-                    tt = datasets_dict[task_name][idx]['input_ids']
-                    print(tokenizer_dict[task_name].decode(tt))
-                    '''
-                    
-                    #input('enter..')
-                    
-                    
-                    
-                    
-                    ''' debug
-                    if miscls_sent in mis_sents:
-                        print('miscls_sent:', miscls_sent)
-                        input('enter..')
-                    else:
-                        mis_sents.append(miscls_sent)
-                    '''
-                    # debug
-                    if len(p_labels) != len(t_labels):
-                        print('Error - difference in label length!!')
-                        input('enter..')
-                    
-                    for p_label, t_label, rel in zip(p_labels, t_labels, rels):
-                        if p_label != t_label:
-                            key = t_label + '-' + p_label
-                            #key = p_label
-                            
-                            # relation_spans -> [e1_span_s, e1_span_e, e2_span_s, e2_span_e, rel['rel_id']]
-                            e1 = input_ids[rel[0]:rel[1]]
-                            e2 = input_ids[rel[2]:rel[3]]
-                            e1 = tokenizer_dict[task_name].decode(e1)
-                            e2 = tokenizer_dict[task_name].decode(e2)
-
-                            e_and_miscls_sent = e1 + ' - ' + e2 + ' | ' + miscls_sent
-                            
-                            if key in miscls_samples_per_data_and_task[data_name][task_name]:
-                                miscls_samples_per_data_and_task[data_name][task_name][key].append(e_and_miscls_sent)
-                            else:
-                                miscls_samples_per_data_and_task[data_name][task_name][key] = [e_and_miscls_sent]
-
-            
-                
-    if do_cross_validation:
-        for data_name, tasks in all_results_per_data_and_task.items():
-            for task_name, all_results in tasks.items():
-                all_accuracy = np.array(all_results['accuracy'])
-                all_precision = np.array(all_results['precision'])
-                all_recall = np.array(all_results['recall'])
-                all_f1 = np.array(all_results['f1'])
-        
-                with open(os.path.join(output_dir, data_name + '_' + task_name + '_result.txt'), 'a') as fp:
-                    fp.write(">> Average Accuracy: %.4f with a std of %.4f\n" % (all_accuracy.mean(), all_accuracy.std()))
-                    fp.write(">> Average Precision: %.4f with a std of %.4f\n" % (all_precision.mean(), all_precision.std()))
-                    fp.write(">> Average Recall: %.4f with a std of %.4f\n" % (all_recall.mean(), all_recall.std()))
-                    fp.write(">> Average F1: %.4f with a std of %.4f\n" % (all_f1.mean(), all_f1.std()))
-    
-    ### TODO: fix this!!
-    if save_misclassified_samples:
-        for data_name, tasks in miscls_samples_per_data_and_task.items():
-            for task_name, mis_samples in tasks.items():
-                for true_pred, sents in mis_samples.items():
-                    with open(os.path.join(output_dir, data_name + '_' + task_name + '_miscls_samples_(' + true_pred + ').txt'), 'a') as fp:
-                        for sent in sents:
-                            fp.write('%s\n' % sent)
-
-
 def main():
     # See all possible arguments in src/transformers/training_args.py
     # or by passing the --help flag to this script.
@@ -547,16 +309,6 @@ def main():
         model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    
-    
-    # debugging
-    '''
-    print('model_args:', model_args)
-    print('data_args:', data_args)
-    print('training_args:', training_args)
-    sys.exit(1)
-    '''
-    
 
     # Setup logging
     logging.basicConfig(
@@ -631,98 +383,15 @@ def main():
         else:
             # We will pad later in data collator, dynamically at batch creation, to the max sequence length in each batch
             padding = False
-            
-        '''
-        def get_model():
-
-            #print(config.vocab_size)
-            
-            config = AutoConfig.from_pretrained(
-                model_args.config_name if model_args.config_name else model_args.model_name_or_path,
-                num_labels=len(label_list),
-                finetuning_task=data_args.task_name,
-                cache_dir=model_args.cache_dir,
-                revision=model_args.model_revision,
-                use_auth_token=True if model_args.use_auth_token else None,
-                
-                # get attention outputs for attention based context.
-                # ref: https://discuss.huggingface.co/t/output-attention-true-after-downloading-a-model/907
-                output_attentions=True if data_args.use_context == "attn_based" else None,
-            )
-
-            ### TODO: make it cleaner by creating 'AutoModelForRelationClassification'.
-            if config.model_type == "bert":
-                model = BertForRelationClassification.from_pretrained(
-                    model_args.model_name_or_path,
-                    from_tf=bool(".ckpt" in model_args.model_name_or_path),
-                    config=config,
-                    cache_dir=model_args.cache_dir,
-                    revision=model_args.model_revision,
-                    use_auth_token=True if model_args.use_auth_token else None,
-                    
-                    # keyword parameters for RE
-                    relation_representation=relation_representation,
-                    use_context=data_args.use_context,
-                    use_entity_type_embeddings=data_args.use_entity_type_embeddings,
-                    num_entity_types=len(entity_types),
-                    tokenizer=tokenizer,
-                    #ignore_mismatched_sizes=True
-                )
-            elif config.model_type == "roberta":
-                model = RobertaForRelationClassification.from_pretrained(
-                    model_args.model_name_or_path,
-                    from_tf=bool(".ckpt" in model_args.model_name_or_path),
-                    config=config,
-                    cache_dir=model_args.cache_dir,
-                    revision=model_args.model_revision,
-                    use_auth_token=True if model_args.use_auth_token else None,
-                    
-                    # keyword parameters for RE
-                    relation_representation=relation_representation,
-                    use_context=data_args.use_context,
-                    use_entity_type_embeddings=data_args.use_entity_type_embeddings,
-                    num_entity_types=len(entity_types),
-                    tokenizer=tokenizer,
-                    #ignore_mismatched_sizes=True
-                )
-
-            #print(config)
-            #input('etner..')
-
-            # Resize input token embeddings matrix of the model since new tokens have been added.
-            # this funct is used if the number of tokens in tokenizer is different from config.vocab_size.
-            model.resize_token_embeddings(len(tokenizer))
-
-            #print('len(tokenizer):', len(tokenizer))
-            #print('model.get_input_embeddings().num_embeddings:', model.get_input_embeddings().num_embeddings)
-            #input('enter..')
-            
-            return model
-        '''
-
+        
         def compute_metrics(p: EvalPrediction):
             pred, true = p.predictions, p.label_ids
-            
-            '''
-            print(pred)
-            print(true)
-            print(pred.shape)
-            print(true.shape)
-            '''
-            
+
             pred = np.argmax(pred, axis=1)
             true = true.flatten()
 
             pred = pred.tolist()
             true = true.tolist()
-            
-            #pred = [label_list[x] for x in pred]
-            #true = [label_list[x] for x in true]
-            
-            #print(pred)
-            #print(true)
-            #input('enter..')
-            
             
             # Remove ignored labels.
             # For ChemProt, ignore false labels. "CPR:false": "id": 0
@@ -750,10 +419,7 @@ def main():
             f = f_m.compute(predictions=pred, references=true, average=average)
             
             return {"accuracy": a["accuracy"], "precision": p["precision"], "recall": r["recall"], "f1": f["f1"]}
-        
-        ### TODO: complete this.
-        results_dict = {} # store prediction results for each dataset and task.
-        
+
         # Remove old output files except the cross-validation result file.
         if os.path.exists(training_args.output_dir):
             for f in os.listdir(training_args.output_dir):
@@ -862,90 +528,30 @@ def main():
             # Add additional special tokens at once. If they are added separately, then only tokens added later remain. 05/04/2022
             if len(additional_special_tokens) > 0:
                 tokenizer.add_special_tokens({"additional_special_tokens": additional_special_tokens})
-            
-            
-            # debugging
-            '''
-            #save_as_pickle("%s_tokenizer.pkl" % model_name, tokenizer_dict[task_name])
-            #logger.info("Saved %s tokenizer at ./data/%s_tokenizer.pkl" %(model_name, model_name))
-            
-            #e1_id = tokenizer_dict[task_name].convert_tokens_to_ids('[E1]')
-            #e2_id = tokenizer_dict[task_name].convert_tokens_to_ids('[E2]')
-            #assert e1_id != e2_id != 1
-            
-            print(config.model_type)
-            print(do_lower_case)
-            #print(tokenizer.do_lower_case)
-            input('enter..')
-            
-            print(tokenizer.all_special_ids)
-            print(tokenizer.all_special_tokens) 
-            print(tokenizer.all_special_tokens_extended)
-            print(tokenizer.additional_special_tokens_ids)
-            print(tokenizer.get_added_vocab)
-            
-            print(tokenizer)
-            #print(isinstance(tokenizer, BertTokenizerFast))
-            print('tokenizer.model_max_length:', tokenizer.model_max_length)
-            print(tokenizer.tokenize("[E1]BioBERT[/E1] sets [E2]do_lower_case[/E2] to True by default. Test IT."))
-            input('enter..')
-            '''
-            
-            
-            
-            
-            ### TODO: make it cleaner by creating 'AutoModelForRelationClassification'.
-            if config.model_type == "bert":
-                model = BertForRelationClassification.from_pretrained(
-                    model_args.model_name_or_path,
-                    from_tf=bool(".ckpt" in model_args.model_name_or_path),
-                    config=config,
-                    cache_dir=model_args.cache_dir,
-                    revision=model_args.model_revision,
-                    use_auth_token=True if model_args.use_auth_token else None,
-                    
-                    # keyword parameters for RE
-                    relation_representation=relation_representation,
-                    use_context=data_args.use_context,
-                    use_entity_type_embeddings=data_args.use_entity_type_embeddings,
-                    num_entity_types=len(entity_types),
-                    tokenizer=tokenizer,
-                )
-            elif config.model_type == "roberta":
-                model = RobertaForRelationClassification.from_pretrained(
-                    model_args.model_name_or_path,
-                    from_tf=bool(".ckpt" in model_args.model_name_or_path),
-                    config=config,
-                    cache_dir=model_args.cache_dir,
-                    revision=model_args.model_revision,
-                    use_auth_token=True if model_args.use_auth_token else None,
-
-                    # keyword parameters for RE
-                    relation_representation=relation_representation,
-                    use_context=data_args.use_context,
-                    use_entity_type_embeddings=data_args.use_entity_type_embeddings,
-                    num_entity_types=len(entity_types),
-                    tokenizer=tokenizer,
-                )
+          
+            model = BertForRelationClassification.from_pretrained(
+                model_args.model_name_or_path,
+                from_tf=bool(".ckpt" in model_args.model_name_or_path),
+                config=config,
+                cache_dir=model_args.cache_dir,
+                revision=model_args.model_revision,
+                use_auth_token=True if model_args.use_auth_token else None,
+                
+                # keyword parameters for RE
+                relation_representation=relation_representation,
+                use_context=data_args.use_context,
+                use_entity_type_embeddings=data_args.use_entity_type_embeddings,
+                num_entity_types=len(entity_types),
+                tokenizer=tokenizer,
+            )
                 
             # Resize input token embeddings matrix of the model since new tokens have been added.
             # this funct is used if the number of tokens in tokenizer is different from config.vocab_size.
             model.resize_token_embeddings(len(tokenizer))
 
-
             # Loading a dataset from your local files.
             data_files = read_dataset(dataset_num, task_name, data_args)
 
-            # debugging
-            '''
-            print(type(data_files["train"]))
-            print(data_files["train"])
-            print(type(data_files["train"][0]))
-            print(data_files["train"][0])
-            print()
-            input('enter..')
-            '''
-            
             # This is a temporary code.
             # In BioInfer, some entities consist of separate tokens in a text, and the partial tokens are not properly tokenized by tokenizer.
             # To avoid the mismatch between entity index from data file and entity index from tokenized output, add the partial tokens to the tokenzier
@@ -967,27 +573,18 @@ def main():
                 # this funct is used if the number of tokens in tokenizer is different from config.vocab_size.
                 model.resize_token_embeddings(len(tokenizer))
 
-
-            dataset = featurize_data(data_files, tokenizer, padding, max_seq_length, relation_representation, use_entity_typed_marker)
+            dataset = featurize_data(data_files, 
+                tokenizer, 
+                padding, 
+                max_seq_length, 
+                relation_representation, 
+                use_entity_typed_marker,
+                data_args.use_context,
+            )
 
             train_dataset = dataset["train"]
             eval_dataset = dataset["validation"] if "validation" in dataset else None
             test_dataset = dataset["test"]
-            
-            # debugging
-            '''
-            for x in train_dataset:
-                print(x)
-                input('enter..')
-            
-            print('len(train_dataset[ppi]):', len(train_dataset['ppi']))
-            print('type(train_dataset[ppi]):', type(train_dataset['ppi']))
-            print('type(train_dataset[ppi][0]):', type(train_dataset['ppi'][0]))
-            print(train_dataset['ppi'][0])
-            print(tokenizer_dict['ppi'].decode(train_dataset['ppi'][0]['input_ids']))
-            print(tokenizer_dict['ppi'].decode(train_dataset['ppi'][0]['input_ids']).replace('[CLS]', ''))
-            input('enter..')
-            '''
             
             # Data collator
             data_collator = DataCollatorForRelationClassification(tokenizer, pad_to_multiple_of=8 if training_args.fp16 else None)
@@ -1038,11 +635,6 @@ def main():
                 trainer.log_metrics("train", metrics)
                 trainer.save_metrics("train", metrics)
                 trainer.save_state()
-            
-            ### TODO: complete this.
-            results_dict[dataset_num] = []
-            preds_dict = {}
-            datasets_dict = {} # used for save_misclassified_samples
             
             eval_info = {"dataset_num": dataset_num, 
                          "seed": training_args.seed,
@@ -1109,37 +701,7 @@ def main():
                                 e2 = ' '.join([tokenizer.decode(input_ids[s:e]) for s, e in e2_span_idx_list])
 
                                 writer.write(f"{index}\t{e1}\t{e2}\t{sent}\t{item}\t{label}\n")
-                                
 
-
-            '''
-            # Prediction
-            if training_args.do_predict:
-                logger.info("*** Predict ***")
-                
-                test_dataloader = trainer.get_test_dataloader(test_dataset=test_dataset)
-                
-                prediction_output = trainer.prediction_loop(
-                    test_dataloader, 
-                    description=f"Test: {task_name}",
-                )
-                
-                # 'datasets' is used for save_misclassified_samples
-                results_dict[dataset_num].append({'data_name': 'pred', 
-                                                  'prediction_output': prediction_output, 
-                                                  'datasets': test_dataloader.dataset,
-                                                  'tokenizer': tokenizer})
-            '''
-            
-            # Delete the saved model.
-            '''
-            model_dir = os.path.join(training_args.output_dir, task_name)
-            try:
-                shutil.rmtree(model_dir)
-            except OSError as e:
-                print("Error: %s : %s" % (model_dir, e.strerror))
-            '''
-        
         if training_args.do_predict:
             # Save the prediction results in a history file.
             result_file = os.path.join(training_args.output_dir, 'predict_results.json')
@@ -1191,23 +753,6 @@ def main():
             
         logger.info("*** Data iterations are done.  ***")
         
-        '''
-        if len(results_dict[0]) > 0:
-            data_list = []
-            if training_args.do_eval:
-                data_list.append('eval')
-
-            if training_args.do_predict:
-                data_list.append('pred')
-
-            save_results(results_dict,
-                         data_list,
-                         task_name,
-                         label_list,
-                         training_args.output_dir,
-                         data_args.do_cross_validation, 
-                         data_args.save_misclassified_samples)
-        '''
 
 if __name__ == "__main__":
     main()
