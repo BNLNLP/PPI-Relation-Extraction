@@ -11,8 +11,7 @@ We provide the extended version of PPI datasets, called typed PPI, which have fu
 ![PPI_RE_architecture](img/model_architecture.jpg)
 
 ## Installation
-You may install the dependencies via either conda or pip. Generally, NBFNet works with Python 3.7/3.8 and PyTorch version >= 1.8.0.
-Python version is 3.7, and the versions of needed packages are listed in requirements.txt
+The code was implemented on Python version 3.9 and and PyTorch version = 1.10.2. The versions of the dependencies are listed in requirements.txt
 
 ## Biomedical Relation Extraction benchmark data
 * ChemProt (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6051439/)
@@ -32,6 +31,40 @@ The data annotation is based on the five PPI benchmark data above plus BioCreati
 * BioCreative VI (Track 4: Mining protein interactions and mutations for precision medicine (PM))
 
 ## Reproduction
+To reproduce the results of the experiments, use the following command:
+
+```bash
+export SEED=1
+export DATASET_DIR=~/BER-NLP/PPI-Relation-Extraction/datasets
+export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/RE_results
+
+# PPI benchmark
+export DATASET_NAME=PPI/original/AImed
+			
+python ~/BER-NLP/PPI-Relation-Extraction/src/relation_extraction/run_re.py \
+	--model_list dmis-lab/biobert-base-cased-v1.1 \
+	--task_name "re" \
+	--dataset_dir $DATASET_DIR \
+	--dataset_name $DATASET_NAME \
+	--output_dir $OUTPUT_DIR \
+	--do_train \
+	--do_predict \
+	--seed $SEED \
+	--remove_unused_columns False \
+	--save_steps 100000 \
+	--per_device_train_batch_size 16 \
+	--per_device_eval_batch_size 32 \
+	--num_train_epochs 10 \
+	--optim "adamw_torch" \
+	--learning_rate 5e-05 \
+	--warmup_ratio 0.0 \
+	--weight_decay 0.0 \
+	--relation_representation "EM_entity_start" \
+	--use_context "attn_based" \
+	--overwrite_cache \
+	--overwrite_output_dir
+```
+
 
 ## Results
 
