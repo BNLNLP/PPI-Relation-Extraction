@@ -16,3 +16,8 @@
 ## Typed PPI data
 The data annotation is based on the five PPI benchmark data above plus BioCreative VI.
 * BioCreative VI (Track 4: Mining protein interactions and mutations for precision medicine (PM))
+
+## Citation
+If you use the Typed PPI data for your research, please cite the following paper.
+
+TBA
