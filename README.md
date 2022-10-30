@@ -72,7 +72,7 @@ with multiple GPUs or multiple machines.
 [TorchDrug]: https://github.com/DeepGraphLearning/torchdrug
 -->
 
-You can find the hyperparameter settings of the datasets in [hyper-parameters configuration.txt](config/hyper-parameters configuration.txt)
+You can find the hyperparameter settings of the datasets in [hyper-parameters configuration.txt](script/run.sh)
 This site was built using [GitHub Pages](https://pages.github.com/).
 [config](config/hyper-parameters configuration.txt)
 
