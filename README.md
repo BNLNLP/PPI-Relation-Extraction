@@ -42,8 +42,8 @@ The data annotation is based on the five PPI benchmark data above plus BioCreati
         <th>Method</th>
         <th>ChemProt</th>
         <th>DDI</th>
-        <th>GAD@1</th>
-        <th>EU-ADR@3</th>
+        <th>GAD</th>
+        <th>EU-ADR</th>
     </tr>
 	<tr>
         <th>SOTA</th>
@@ -69,27 +69,43 @@ The data annotation is based on the five PPI benchmark data above plus BioCreati
 </table>
 
 ### PPI benchmark data ###
-
+     
 <table>
     <tr>
-        <th>Dataset</th>
-        <th>AUROC</th>
-        <th>AP</th>
+        <th>Method</th>
+        <th>AIMed</th>
+        <th>BioInfer</th>
+        <th>HPRD50</th>
+        <th>IEPA</th>
+		<th>LLL</th>
+		<th>Avg.</th>
+    </tr>
+	<tr>
+        <th>SOTA</th>
+        <td>83.9</td>
+        <td>90.3</td>
+        <td>85.5</td>
+        <td>84.9</td>
+		<td>89.2</td>
+        <td>86.5</td>
     </tr>
     <tr>
-        <th>Cora</th>
-        <td>0.956</td>
-        <td>0.962</td>
+        <th>Ours (Entity Mention Pooling + Relation Context)</th>
+        <td>90.8</td>
+        <td>88.2</td>
+        <td>84.5</td>
+        <td>85.9</td>
+		<td>84.6</td>
+        <td>86.8</td>
     </tr>
     <tr>
-        <th>CiteSeer</th>
-        <td>0.923</td>
-        <td>0.936</td>
-    </tr>
-    <tr>
-        <th>PubMed</th>
-        <td>0.983</td>
-        <td>0.982</td>
+        <th>Ours (Entity Start Marker + Relation Context)</th>
+        <td>92.0</td>
+        <td>91.3</td>
+        <td>88.2</td>
+        <td>87.4</td>
+		<td>89.4</td>
+        <td>89.7</td>
     </tr>
 </table>
 
@@ -97,28 +113,16 @@ The data annotation is based on the five PPI benchmark data above plus BioCreati
 
 <table>
     <tr>
-        <th rowspan="2">Dataset</th>
-        <th colspan="4">HITS@10 (50 sample)</th>
+        <th>Method</th>
+        <th>Typed PPI</th>
     </tr>
     <tr>
-        <th>v1</th>
-        <th>v2</th>
-        <th>v3</th>
-        <th>v4</th>
+        <th>Ours (Entity Mention Pooling + Relation Context)</th>
+        <td>86.4</td>
     </tr>
     <tr>
-        <th>FB15k-237</th>
-        <td>0.834</td>
-        <td>0.949</td>
-        <td>0.951</td>
-        <td>0.960</td>
-    </tr>
-    <tr>
-        <th>WN18RR</th>
-        <td>0.948</td>
-        <td>0.905</td>
-        <td>0.893</td>
-        <td>0.890</td>
+        <th>Ours (Entity Start Marker + Relation Context)</th>
+        <td>87.8</td>
     </tr>
 </table>
 
