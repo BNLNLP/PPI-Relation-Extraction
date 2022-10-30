@@ -1,9 +1,18 @@
 # PPI-Relation-Extraction
+This is the official code of the paper
+
+Protein-Protein Interactions (PPIs) Extraction from Biomedical Literature using Attention-based Relational Context Information (link will be added.)
+
+## Overview
 The project aims to build a Protein-Protein Interaction (PPI) extraction model based on Transformer architecture. 
 We used the five PPI benchmark datasets and three relation extraction (RE) datasets to evaluate our model.
 We provide the extended version of PPI datasets, called typed PPI, which have further augmented those positive/negative calls with own PPI role labels (structural or enzymatic). <br/>
 
 ![PPI_RE_architecture](img/model_architecture.jpg)
+
+## Installation
+You may install the dependencies via either conda or pip. Generally, NBFNet works with Python 3.7/3.8 and PyTorch version >= 1.8.0.
+Python version is 3.7, and the versions of needed packages are listed in requirements.txt
 
 ## Biomedical Relation Extraction benchmark data
 * ChemProt (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6051439/)

@@ -21,8 +21,8 @@ do
             #export DATASET_NAME=EU-ADR_BioBERT
             
             # PPI benchmark
-            export DATASET_NAME=PPI/original/AImed
-            #export DATASET_NAME=PPI/original/BioInfer
+            #export DATASET_NAME=PPI/original/AImed
+            export DATASET_NAME=PPI/original/BioInfer
             #export DATASET_NAME=PPI/original/HPRD50
             #export DATASET_NAME=PPI/original/IEPA
             #export DATASET_NAME=PPI/original/LLL
@@ -30,12 +30,11 @@ do
             # Typed PPI
             #export DATASET_NAME=PPI/type_annotation/Typed_PPI
             
+            #srun -p volta -A nlp-sbu -t 24:00:00 -N 1 --gres=gpu:2 -J re \
             #srun -p voltadebug -A nlp-sbu -t 24:00:00 -N 1 --gres=gpu:2 -J re \
-            
-            #srun -p volta -A nlp-sbu -t 24:00:00 -N 1 --gres=gpu:2 -J re \			
-            
-			
-			python ~/BER-NLP/PPI-Relation-Extraction/src/relation_extraction/run_re.py \
+
+            srun -p volta -A nlp-sbu -t 24:00:00 -N 1 --gres=gpu:2 -J re \
+            python ~/BER-NLP/PPI-Relation-Extraction/src/relation_extraction/run_re.py \
                 --model_list dmis-lab/biobert-base-cased-v1.1 \
                 --task_name "re" \
                 --dataset_dir $DATASET_DIR \
@@ -46,7 +45,7 @@ do
                 --seed $SEED \
                 --remove_unused_columns False \
                 --save_steps 100000 \
-                --per_device_train_batch_size 8 \
+                --per_device_train_batch_size 16 \
                 --per_device_eval_batch_size 32 \
                 --num_train_epochs 10 \
                 --optim "adamw_torch" \
