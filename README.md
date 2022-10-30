@@ -74,7 +74,7 @@ with multiple GPUs or multiple machines.
 
 You can find the hyperparameter settings of the datasets in [hyper-parameters configuration.txt][config]
 
-![config]: config/hyper-parameters configuration.txt
+[config](config/hyper-parameters configuration.txt)
 
 ## Results
 
