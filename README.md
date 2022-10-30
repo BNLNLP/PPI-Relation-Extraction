@@ -65,9 +65,16 @@ python PPI-Relation-Extraction/src/relation_extraction/run_re.py \
   --overwrite_output_dir
 ```
 
+<!--
+This codebase is based on PyTorch and [TorchDrug]. It supports training and inference
+with multiple GPUs or multiple machines.
+
+[TorchDrug]: https://github.com/DeepGraphLearning/torchdrug
+-->
+
 You can find the hyperparameter settings of the datasets in [hyper-parameters configuration.txt][config]
 
-[config]: config/hyper-parameters configuration.txt
+![config]: config/hyper-parameters configuration.txt
 
 ## Results
 
