@@ -43,18 +43,6 @@ from dataset_utils import *
 from model import BertForRelationClassification
 from data_collator import DataCollatorForRelationClassification
 
-### TODO: remove this if not used.
-# this is used for DDI evaluation. Remove it once DDI evaluation is combined with seqeval.
-from sklearn.metrics import f1_score, accuracy_score, classification_report, recall_score, precision_score, precision_recall_fscore_support
-
-### TODO: uncomment this after test.
-# Will error if the minimal version of Transformers is not installed. Remove at your own risks.
-#check_min_version("4.17.0")
-
-### TODO: define requirements by referring the following examples.
-#require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/token-classification/requirements.txt")
-#require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/text-classification/requirements.txt")
-
 
 dataset_list = ["ChemProt_BLURB", "DDI_BLURB", "GAD_BLURB", "EU-ADR_BioBERT",
                 "AImed", "BioInfer", "HPRD50", "IEPA", "LLL",
@@ -213,9 +201,6 @@ class DataTrainingArguments:
     relation_types: str = field(
         default=None, metadata={"help": "Relation type file (name and id)."},
     )
-    entity_types: str = field(
-        default=None, metadata={"help": "Entity type file (name and id)."},
-    )
     relation_representation: str = field(
         default="STANDARD_mention_pooling",
         metadata={"help": "vairous relation representations from [2019] Matching the Blanks: Distributional Similarity for Relation Learning. "
@@ -228,7 +213,6 @@ class DataTrainingArguments:
                           "						   EM_entity_start, "
                           " * for poolings, max pooling is used. "},
     )
-    
     use_context: str = field(
         default=None,
         metadata={"help": "Here, context indicates tokens related to entities' relational information. "
@@ -236,25 +220,6 @@ class DataTrainingArguments:
                           "Options: "
                           "1) attn_based: context based on attention probability calculation, "
                           "2) local: local context (tokens between the two entities) "},
-    )
-    
-    '''
-    use_local_context: Optional[bool] = field(
-        default=False, 
-        metadata={"help": "Whether to use local context (tokens between the two entities)."},
-    )
-    '''
-
-    use_entity_type_embeddings: Optional[bool] = field(
-        default=False, 
-        metadata={"help": "Whether to use entity type embeddings."},
-    )
-    use_entity_typed_marker: Optional[bool] = field(
-        default=False, 
-        metadata={
-            "help": "Whether to use entity typed marker. E.g., [GENE], [/GENE] instead of [E1], [/E1] "
-            "This value is used in conjunction with EM representation."
-        },
     )
     # [END][GP] - data parameters.
 
@@ -332,7 +297,6 @@ def main():
     logger.info(f"Training/evaluation parameters {training_args}")
     
     relation_representation = data_args.relation_representation
-    use_entity_typed_marker = data_args.use_entity_typed_marker
     
     model_list = model_args.model_list
     task_name = data_args.task_name
@@ -342,11 +306,7 @@ def main():
     relation_type_file = os.path.join(data_args.dataset_dir, dataset_name)
     relation_type_file = os.path.join(relation_type_file, "relation_types.json")
     relation_types = json.load(open(relation_type_file))
-    
-    entity_type_file = os.path.join(data_args.dataset_dir, dataset_name)
-    entity_type_file = os.path.join(entity_type_file, "entity_types.json")
-    entity_types = json.load(open(entity_type_file))	
-    
+
     label_list = list(relation_types.keys())
         
     initial_output_dir = training_args.output_dir
@@ -365,14 +325,6 @@ def main():
         if data_args.use_context != None:
             if data_args.use_context == "attn_based":
                 training_args.output_dir += "_ac"
-            elif data_args.use_context == "local":
-                training_args.output_dir += "_lc"
-        
-        if data_args.use_entity_type_embeddings:
-            training_args.output_dir += "_et"
-            
-        if data_args.use_entity_typed_marker:
-            training_args.output_dir += "_tm"
 
         # Set seed before initializing model.
         set_seed(training_args.seed)
@@ -512,19 +464,12 @@ def main():
             # Use add_special_tokens() instead.
             additional_special_tokens = []
             if relation_representation.startswith('EM'):
-                #additional_special_tokens = {"additional_special_tokens": entity_marker_special_tokens[dataset_name] if use_entity_typed_marker \
-                #                                                          else entity_marker_special_tokens['EM']}
-                additional_special_tokens.extend(entity_marker_special_tokens[dataset_name] if use_entity_typed_marker \
-                                                                                            else entity_marker_special_tokens['EM'])                                                              
-                #tokenizer.add_special_tokens(additional_special_tokens)
+               additional_special_tokens.extend(entity_marker_special_tokens['EM'])
             
             # Add the special tokens that are used to replace entity names (entity anonymization or dummification). E.g,. ChemProt, DDI, GAD
             if dataset_name in dataset_special_tokens.keys():
-                #additional_special_tokens = {"additional_special_tokens": dataset_special_tokens[dataset_name]}
                 additional_special_tokens.extend(dataset_special_tokens[dataset_name])
-                
-                #tokenizer.add_special_tokens(additional_special_tokens)
-            
+
             # Add additional special tokens at once. If they are added separately, then only tokens added later remain. 05/04/2022
             if len(additional_special_tokens) > 0:
                 tokenizer.add_special_tokens({"additional_special_tokens": additional_special_tokens})
@@ -540,8 +485,6 @@ def main():
                 # keyword parameters for RE
                 relation_representation=relation_representation,
                 use_context=data_args.use_context,
-                use_entity_type_embeddings=data_args.use_entity_type_embeddings,
-                num_entity_types=len(entity_types),
                 tokenizer=tokenizer,
             )
                 
@@ -578,7 +521,6 @@ def main():
                 padding, 
                 max_seq_length, 
                 relation_representation, 
-                use_entity_typed_marker,
                 data_args.use_context,
             )
 

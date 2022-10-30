@@ -21,8 +21,8 @@ do
             #export DATASET_NAME=EU-ADR_BioBERT
             
             # PPI benchmark
-            #export DATASET_NAME=PPI/original/AImed
-            export DATASET_NAME=PPI/original/BioInfer
+            export DATASET_NAME=PPI/original/AImed
+            #export DATASET_NAME=PPI/original/BioInfer
             #export DATASET_NAME=PPI/original/HPRD50
             #export DATASET_NAME=PPI/original/IEPA
             #export DATASET_NAME=PPI/original/LLL
@@ -54,7 +54,6 @@ do
                 --weight_decay 0.0 \
                 --relation_representation "EM_entity_start" \
                 --use_context "attn_based" \
-                --use_entity_type_embeddings False \
                 --overwrite_cache \
                 --overwrite_output_dir
                 

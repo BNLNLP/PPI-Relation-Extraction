@@ -1,5 +1,5 @@
 # PPI-Relation-Extraction
-This is the official code of the paper
+This is the official code of the paper:
 
 Protein-Protein Interactions (PPIs) Extraction from Biomedical Literature using Attention-based Relational Context Information (link will be added.)
 
@@ -14,7 +14,7 @@ We provide the extended version of PPI datasets, called typed PPI, which have fu
 The code was implemented on Python version 3.9 and and PyTorch version = 1.10.2. The versions of the dependencies are listed in requirements.txt
 
 ## Datasets
-** Please refer the [README.md](dataset/README.md) in the datasets directory.
+** Please refer the [README.md](datasets/README.md) in the datasets directory.
 
 
 ## Reproduction
@@ -52,7 +52,7 @@ python PPI-Relation-Extraction/src/relation_extraction/run_re.py \
   --overwrite_output_dir
 ```
 
-You can run the bash script [run.sh](script/run.sh), and you can find the hyperparameter settings of the datasets in [hyper-parameters-configuration.txt](config/hyper-parameters-configuration.txt)
+Refer to the bash script [run.sh](script/run.sh), and you can find the hyperparameter settings of the datasets in [hyper-parameters-configuration.txt](config/hyper-parameters-configuration.txt)
 
 ## Results
 Here are the results of the model. The model was trained on the machine, Tesla V100-SXM2-32GB × 2. Note different number of GPUs and batch size can produce slightly different results.

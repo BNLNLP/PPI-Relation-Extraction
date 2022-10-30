@@ -32,10 +32,6 @@ class BertForRelationClassification(BertPreTrainedModel):
         
         self.relation_representation = kwargs['relation_representation']
         self.use_context = kwargs['use_context'] 
-        self.num_entity_types = kwargs['num_entity_types']
-        
-        self.enable_predicate_span = False
-        
         self.tokenizer = kwargs['tokenizer']
         
         if self.relation_representation in ['STANDARD_mention_pooling', 'EM_mention_pooling', 'EM_entity_start']:
@@ -74,10 +70,7 @@ class BertForRelationClassification(BertPreTrainedModel):
         output_hidden_states=None,
         return_dict=None,
         
-
         relations=None,
-        entity_types=None,
-        predicates=None,
         tokens_seq=None,
         tokens_to_ignore=None,
 
@@ -110,31 +103,18 @@ class BertForRelationClassification(BertPreTrainedModel):
         # offset used to find local context. In case of entity markers, ignore marker tokens for local context.
         # E.g., in the sample [E1] gene1 [/E1] activates [E2] gene2 [/E2], the local context should be just 'activates'.
         lc_offset = 1 if self.relation_representation.startswith('EM') else 0
-        
-        # This code is merged in the following logic to make CLS tokens work with other features such context and entity type embeds. 05/05/2022
-        '''
-        ### TODO: fix the error that 'STANDARD_cls_token', 'EM_cls_token' have the same results.
-        if self.relation_representation in ['STANDARD_cls_token', 'EM_cls_token']:
-            cls_token = self.dropout(pooled_output)
-            #cls_token = sequence_output[:, 0, :]
-            logits = self.classifier(cls_token)
-        
-        else:
-        '''
+
         # This is used for [CLS] token.
         pooled_output_dropout = self.dropout(pooled_output)
         
         buffer = []
-        #n = 0 # num_newly_added_label (used for undirected (symmetric) relations)
         
         # iterate batch & collect
         for i in range(sequence_output.size()[0]):
             rel_list = [x for x in torch.split(relations[i], 2) if all(xx == -100 for xx in x.tolist()) is False] # e1_span_idx_list, e2_span_idx_list
-            entity_type_list = [x for x in torch.split(entity_types[i], 2) if -100 not in x]
 
             # In case of EM, a sample has a single relation. In case of marker-free, a sample can have multiple relations.
-            #for rel, predicate, entity_type in zip(rel_list, predicate_list, entity_type_list):
-            for rel, entity_type in zip(rel_list, entity_type_list):
+            for rel in rel_list:
                 e1_span_idx_list = rel[0]
                 e2_span_idx_list = rel[1]
                 

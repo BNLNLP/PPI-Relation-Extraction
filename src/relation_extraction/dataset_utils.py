@@ -30,11 +30,11 @@ def read_dataset(dataset_num=0, task_name=None, data_args=None):
     return load_dataset(extension, data_files=data_files)
     
     
-def tokenize_and_set_relation_labels(examples, tokenizer, padding, max_seq_length, relation_representation, use_entity_typed_marker, use_context):
+def tokenize_and_set_relation_labels(examples, tokenizer, padding, max_seq_length, relation_representation, use_context):
 
     if 'text' in examples:
         if relation_representation.startswith('EM'):
-            token_key = 'text_with_typed_entity_marker' if use_entity_typed_marker else 'text_with_entity_marker'
+            token_key = 'text_with_entity_marker'
         else:
             token_key = 'text'
         
@@ -46,7 +46,7 @@ def tokenize_and_set_relation_labels(examples, tokenizer, padding, max_seq_lengt
         )
     elif 'tokens' in examples:
         if relation_representation.startswith('EM'):
-            token_key = 'tokens_with_typed_marker' if use_entity_typed_marker else 'tokens_with_marker'
+            token_key = 'tokens_with_marker'
         else:
             token_key = 'tokens'
         
@@ -63,8 +63,6 @@ def tokenize_and_set_relation_labels(examples, tokenizer, padding, max_seq_lengt
 
     labels = []
     relations = []
-    predicates = []
-    entity_types = []
     
     tokens_seq = []
     tokens_to_ignore = []
@@ -100,12 +98,8 @@ def tokenize_and_set_relation_labels(examples, tokenizer, padding, max_seq_lengt
                 e1_span_idx_list, e2_span_idx_list = [], []
                 
                 if relation_representation.startswith('EM'):
-                    if use_entity_typed_marker:
-                        e1_idx = rel['entity_1_idx_in_text_with_typed_entity_marker']
-                        e2_idx = rel['entity_2_idx_in_text_with_typed_entity_marker']
-                    else:
-                        e1_idx = rel['entity_1_idx_in_text_with_entity_marker']
-                        e2_idx = rel['entity_2_idx_in_text_with_entity_marker']
+                    e1_idx = rel['entity_1_idx_in_text_with_entity_marker']
+                    e2_idx = rel['entity_2_idx_in_text_with_entity_marker']
                     
                     ## TODO: remove this!! the first token is used for separate tokens.
                     if np.asarray(e1_idx).ndim > 1 or np.asarray(e2_idx).ndim > 1:
@@ -138,7 +132,6 @@ def tokenize_and_set_relation_labels(examples, tokenizer, padding, max_seq_lengt
             
         labels.append(label_ids)
         relations.append(relation_spans)
-        entity_types.append(ent_types)
 
         if use_context == "attn_based":
             input_tokens = tokenized_inputs.tokens(batch_index=i)
@@ -159,26 +152,20 @@ def tokenize_and_set_relation_labels(examples, tokenizer, padding, max_seq_lengt
             
             tokenized_inputs['tokens_seq'] = tokens_seq
             tokenized_inputs['tokens_to_ignore'] = tokens_to_ignore
- 
     
     tokenized_inputs['labels'] = labels
     tokenized_inputs['relations'] = relations
-    tokenized_inputs['entity_types'] = entity_types
     
     return tokenized_inputs
 
 
-def featurize_data(dataset, tokenizer, padding, max_seq_length, relation_representation, use_entity_typed_marker, use_context):
+def featurize_data(dataset, tokenizer, padding, max_seq_length, relation_representation, use_context):
     convert_func_dict = tokenize_and_set_relation_labels
     
     if use_context == "attn_based":
-        columns = ['input_ids', 'attention_mask', 'labels', 'token_type_ids', 'relations', 'entity_types', 'tokens_seq', 'tokens_to_ignore']
+        columns = ['input_ids', 'attention_mask', 'labels', 'token_type_ids', 'relations', 'tokens_seq', 'tokens_to_ignore']
     else:
-        columns = ['input_ids', 'attention_mask', 'labels', 'token_type_ids', 'relations', 'entity_types']
-        
-    # RoBERTa doesn't use NSP, so it doesn't need 'token_type_ids' which is segement IDs.
-    if isinstance(tokenizer, RobertaTokenizerFast):
-        columns.remove('token_type_ids')
+        columns = ['input_ids', 'attention_mask', 'labels', 'token_type_ids', 'relations']
 
     features = {}
     for phase, phase_dataset in dataset.items():
@@ -188,7 +175,6 @@ def featurize_data(dataset, tokenizer, padding, max_seq_length, relation_represe
                        'padding': padding,
                        'max_seq_length': max_seq_length,
                        'relation_representation': relation_representation,
-                       'use_entity_typed_marker': use_entity_typed_marker,
                        'use_context': use_context},
             batched=True,
             load_from_cache_file=False,
