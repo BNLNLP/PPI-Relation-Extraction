@@ -65,7 +65,9 @@ python PPI-Relation-Extraction/src/relation_extraction/run_re.py \
   --overwrite_output_dir
 ```
 
-You can find the hyperparameter settings of the datasets in [config]: config/hyper-parameters configuration.txt
+You can find the hyperparameter settings of the datasets in [hyper-parameters configuration.txt][config]
+
+[config]: config/hyper-parameters configuration.txt
 
 ## Results
 
