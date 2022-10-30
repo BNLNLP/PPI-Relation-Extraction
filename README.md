@@ -35,36 +35,37 @@ To reproduce the results of the experiments, use the following command:
 
 ```bash
 export SEED=1
-export DATASET_DIR=~/BER-NLP/PPI-Relation-Extraction/datasets
-export OUTPUT_DIR=/hpcgpfs01/scratch/gpark/RE_results
+export DATASET_DIR=PPI-Relation-Extraction/datasets
+export OUTPUT_DIR=PPI-Relation-Extraction/YOUR-OUTPUT-DIR
 
 # PPI benchmark
 export DATASET_NAME=PPI/original/AImed
 			
-python ~/BER-NLP/PPI-Relation-Extraction/src/relation_extraction/run_re.py \
-	--model_list dmis-lab/biobert-base-cased-v1.1 \
-	--task_name "re" \
-	--dataset_dir $DATASET_DIR \
-	--dataset_name $DATASET_NAME \
-	--output_dir $OUTPUT_DIR \
-	--do_train \
-	--do_predict \
-	--seed $SEED \
-	--remove_unused_columns False \
-	--save_steps 100000 \
-	--per_device_train_batch_size 16 \
-	--per_device_eval_batch_size 32 \
-	--num_train_epochs 10 \
-	--optim "adamw_torch" \
-	--learning_rate 5e-05 \
-	--warmup_ratio 0.0 \
-	--weight_decay 0.0 \
-	--relation_representation "EM_entity_start" \
-	--use_context "attn_based" \
-	--overwrite_cache \
-	--overwrite_output_dir
+python PPI-Relation-Extraction/src/relation_extraction/run_re.py \
+  --model_list dmis-lab/biobert-base-cased-v1.1 \
+  --task_name "re" \
+  --dataset_dir $DATASET_DIR \
+  --dataset_name $DATASET_NAME \
+  --output_dir $OUTPUT_DIR \
+  --do_train \
+  --do_predict \
+  --seed $SEED \
+  --remove_unused_columns False \
+  --save_steps 100000 \
+  --per_device_train_batch_size 16 \
+  --per_device_eval_batch_size 32 \
+  --num_train_epochs 10 \
+  --optim "adamw_torch" \
+  --learning_rate 5e-05 \
+  --warmup_ratio 0.0 \
+  --weight_decay 0.0 \
+  --relation_representation "EM_entity_start" \
+  --use_context "attn_based" \
+  --overwrite_cache \
+  --overwrite_output_dir
 ```
 
+You can find the hyperparameter settings of the datasets in [config]: config/hyper-parameters configuration.txt
 
 ## Results
 
