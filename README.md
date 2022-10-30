@@ -5,7 +5,7 @@ Protein-Protein Interactions (PPIs) Extraction from Biomedical Literature using 
 
 ## Overview
 The project aims to build a Protein-Protein Interaction (PPI) extraction model based on Transformer architecture. 
-We used the five PPI benchmark datasets and three relation extraction (RE) datasets to evaluate our model.
+We used the five PPI benchmark datasets and four biomedical relation extraction (RE) datasets to evaluate our model.
 We provide the extended version of PPI datasets, called typed PPI, which have further augmented those positive/negative calls with own PPI role labels (structural or enzymatic). <br/>
 
 ![PPI_RE_architecture](img/model_architecture.jpg)
