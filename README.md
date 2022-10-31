@@ -9,6 +9,7 @@ We used the five PPI benchmark datasets and four biomedical relation extraction 
 We provide the extended version of PPI datasets, called typed PPI, which have further augmented those positive/negative calls with own PPI role labels (structural or enzymatic). <br/>
 
 ![PPI_RE_architecture](img/model_architecture.jpg)
+*image_caption*
 
 ## Installation
 The code was implemented on Python version 3.9 and and PyTorch version = 1.10.2. The versions of the dependencies are listed in requirements.txt
