@@ -9,7 +9,9 @@ We used the five PPI benchmark datasets and four biomedical relation extraction 
 We provide the extended version of PPI datasets, called typed PPI, which have further augmented those positive/negative calls with own PPI role labels (structural or enzymatic). <br/>
 
 ![PPI_RE_architecture](img/model_architecture.jpg)
-*image_caption*
+*The representation consists of entity start markers and the max-pooled of relational context which is a series of tokens chosen by attention probability
+of the entities. If markers are unused, entity start markers are replaced with the max-pooled of two entity contextualized embeddings. The example sentence is ”Absence of alpha-syntrophin leads to structurally aberrant neuromuscular synapses deficient in utrophin.” (source from:
+BioInfer corpus)*
 
 ## Installation
 The code was implemented on Python version 3.9 and and PyTorch version = 1.10.2. The versions of the dependencies are listed in requirements.txt
