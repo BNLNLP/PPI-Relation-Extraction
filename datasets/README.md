@@ -3,7 +3,7 @@
 ## Biomedical Relation Extraction benchmark data
 There are various versions of the ChemProt, DDI, and GAD datasets. Here, we adopt the recent and widely used
 benchmark data, the Biomedical Language Understanding and Reasoning Benchmark ([BLURB](https://dl.acm.org/doi/pdf/10.1145/3458754)). We also
-use the EU-ADR data in BioBERT [26].
+use the EU-ADR data in [BioBERT](https://academic.oup.com/bioinformatics/article/36/4/1234/5566506).
 
 * ChemProt (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6051439/)
 * DDI (https://www.sciencedirect.com/science/article/pii/S1532046413001123?via%3Dihub)
@@ -11,7 +11,7 @@ use the EU-ADR data in BioBERT [26].
 * EU-ADR (https://www.sciencedirect.com/science/article/pii/S1532046412000573)
 
 ## PPI benchmark data
-We adopt the unified version of PPI benchmark datasets provided by [10] that has been used in the SOTA models. In the datasets, the
+We adopt the unified version of PPI benchmark datasets provided by [Pyysalo et al.](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-9-S3-S6) that has been used in the SOTA models. In the datasets, the
 PPI relations are tagged with either *positive* or *negative*.
 * AIMed (https://www.sciencedirect.com/science/article/pii/S0933365704001319)
 * BioInfer (https://link.springer.com/article/10.1186/1471-2105-8-50)
