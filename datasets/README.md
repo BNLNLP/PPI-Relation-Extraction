@@ -1,12 +1,18 @@
 # Datasets
 
 ## Biomedical Relation Extraction benchmark data
+There are various versions of the ChemProt, DDI, and GAD datasets. Here, we adopt the recent and widely used
+benchmark data, the Biomedical Language Understanding and Reasoning Benchmark (BLURB) provided by [25]. We also
+use the EU-ADR data in BioBERT [26].
+
 * ChemProt (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6051439/)
 * DDI (https://www.sciencedirect.com/science/article/pii/S1532046413001123?via%3Dihub)
 * GAD (https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-015-0472-9)
 * EU-ADR (https://www.sciencedirect.com/science/article/pii/S1532046412000573)
 
 ## PPI benchmark data
+We adopt the unified version of PPI benchmark datasets provided by [10] that has been used in the SOTA models. In the datasets, the
+PPI relations are tagged with either positive or negative.
 * AIMed (https://www.sciencedirect.com/science/article/pii/S0933365704001319)
 * BioInfer (https://link.springer.com/article/10.1186/1471-2105-8-50)
 * HPRD50 (https://academic.oup.com/bioinformatics/article/23/3/365/236564)
@@ -14,8 +20,61 @@
 * LLL (https://hal.inrae.fr/hal-02762818/document)
 
 ## Typed PPI data
-The data annotation is based on the five PPI benchmark data above plus BioCreative VI.
-* BioCreative VI (Track 4: Mining protein interactions and mutations for precision medicine (PM))
+Our PPI annotations with interaction types (enzyme, structural, or negative) are the expanded version of the five benchmark corpora and the BioCreative VI protein interaction dataset (Track 4: Mining protein interactions and mutations for precision medicine (PM).
+* BioCreative VI (https://academic.oup.com/database/article/doi/10.1093/database/bay147/5303240?login=true)
+Table III displays the corpora statistics. The annotation work in all corpora has been carried out in a sentence boundary as engaged in the five PPI benchmark corpora.
+
+<table>
+    <tr>
+        <th></th>
+        <th>Enzyme</th>
+        <th>Structural</th>
+        <th>Negative</th>
+    </tr>
+	<tr>
+        <th>BioCreative VI</th>
+        <td>378</td>
+        <td>83</td>
+        <td>0</td>
+    </tr>
+    <tr>
+        <th>AIMed</th>
+        <td>548</td>
+        <td>182</td>
+        <td>1,371</td>
+    </tr>
+    <tr>
+        <th>BioInfer</th>
+        <td>604</td>
+        <td>1,465</td>
+        <td>2,148</td>
+    </tr>
+	<tr>
+        <th>HPRD50</th>
+        <td>103</td>
+        <td>34</td>
+        <td>87</td>
+    </tr>
+    <tr>
+        <th>IEPA</th>
+        <td>271</td>
+        <td>2</td>
+        <td>224</td>
+    </tr>
+    <tr>
+        <th>LLL</th>
+        <td>163</td>
+        <td>0</td>
+        <td>0</td>
+    </tr>
+	<tr>
+        <th>TOTAL</th>
+        <td>2,067</td>
+        <td>1,766</td>
+        <td>3,830</td>
+    </tr>
+</table>
+*Interaction typed ppi corpora for enzyme, structural, and negative classes. The significant reduction from the original data in negative samples is explained in the section III-A3 in the paper.*
 
 ## Citation
 If you use the Typed PPI data for your research, please cite the following paper.
