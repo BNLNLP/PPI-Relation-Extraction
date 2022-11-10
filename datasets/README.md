@@ -80,6 +80,8 @@ Table below displays the corpora statistics. The annotation work in all corpora 
 </table>
 
 The significant reduction from the original data in *negative* samples is explained in the section III-A3 in our paper (TODO: add a link).
+
+Annotation process diagram
 ![Annotation process diagram](../img/annotation_diagram.jpg)
 
 If you use the Typed PPI data for your research, please cite the following paper.
