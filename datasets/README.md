@@ -2,7 +2,7 @@
 
 ## Biomedical Relation Extraction benchmark data
 There are various versions of the ChemProt, DDI, and GAD datasets. Here, we adopt the recent and widely used
-benchmark data, the Biomedical Language Understanding and Reasoning Benchmark (BLURB) provided by [25]. We also
+benchmark data, the Biomedical Language Understanding and Reasoning Benchmark ([BLURB](https://dl.acm.org/doi/pdf/10.1145/3458754)). We also
 use the EU-ADR data in BioBERT [26].
 
 * ChemProt (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6051439/)
@@ -12,7 +12,7 @@ use the EU-ADR data in BioBERT [26].
 
 ## PPI benchmark data
 We adopt the unified version of PPI benchmark datasets provided by [10] that has been used in the SOTA models. In the datasets, the
-PPI relations are tagged with either positive or negative.
+PPI relations are tagged with either *positive* or *negative*.
 * AIMed (https://www.sciencedirect.com/science/article/pii/S0933365704001319)
 * BioInfer (https://link.springer.com/article/10.1186/1471-2105-8-50)
 * HPRD50 (https://academic.oup.com/bioinformatics/article/23/3/365/236564)
@@ -20,7 +20,7 @@ PPI relations are tagged with either positive or negative.
 * LLL (https://hal.inrae.fr/hal-02762818/document)
 
 ## Typed PPI data
-Our PPI annotations with interaction types (enzyme, structural, or negative) are the expanded version of the five benchmark corpora and the BioCreative VI protein interaction dataset (Track 4: Mining protein interactions and mutations for precision medicine (PM).
+Our PPI annotations with interaction types (*enzyme*, *structural*, or *negative*) are the expanded version of the five benchmark corpora and the BioCreative VI protein interaction dataset (Track 4: Mining protein interactions and mutations for precision medicine (PM).
 * BioCreative VI (https://academic.oup.com/database/article/doi/10.1093/database/bay147/5303240?login=true)
 
 Table below displays the corpora statistics. The annotation work in all corpora has been carried out in a sentence boundary as engaged in the five PPI benchmark corpora.
@@ -76,7 +76,7 @@ Table below displays the corpora statistics. The annotation work in all corpora 
         <td>3,830</td>
     </tr>
 </table>
-Interaction typed ppi corpora for enzyme, structural, and negative classes. The significant reduction from the original data in negative samples is explained in the section III-A3 in the paper.
+The significant reduction from the original data in *negative* samples is explained in the section III-A3 in the paper.
 
 
 ## Citation
