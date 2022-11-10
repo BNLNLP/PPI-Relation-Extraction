@@ -24,7 +24,7 @@ PPI relations are tagged with either *positive* or *negative*.
 Our PPI annotations with interaction types (*enzyme*, *structural*, or *negative*) are the expanded version of the five PPI benchmark corpora and the BioCreative VI protein interaction dataset (Track 4: Mining protein interactions and mutations for precision medicine (PM).
 * BioCreative VI (https://academic.oup.com/database/article/doi/10.1093/database/bay147/5303240)
 
-You can find annotation rules and comments [here](PPI/type_annotation/Typed_PPI/annotation_resources).
+You can find annotation rules and comments [here](PPI/type_annotation/annotation_resources).
 Table below displays the corpora statistics. The annotation work in all corpora has been carried out in a sentence boundary as engaged in the five PPI benchmark corpora.
 
 
