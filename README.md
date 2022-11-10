@@ -9,8 +9,7 @@ We used the five PPI benchmark datasets and four biomedical relation extraction 
 We provide the extended version of PPI datasets, called typed PPI, which have further augmented those positive/negative calls with own PPI role labels (structural or enzymatic). <br/>
 
 ![PPI_RE_architecture](img/model_architecture_entity_start.jpg)
-*Figure: The relation representation consists of entity start markers and the max-pooled of relational context, which is a series of tokens chosen by attention probability of the entities. The relation representation based on mention pooling is depicted in [mention_pooling](img/model_architecture_mention_pooling.jpg). The example sentence is "Absence of alpha-syntrophin leads to structurally aberrant neuromuscular synapses deficient in utrophin". (Source: BioInfer corpus).
-
+*Figure: The relation representation consists of entity start markers and the max-pooled of relational context, which is a series of tokens chosen by attention probability of the entities. The relation representation based on mention pooling is depicted in [mention_pooling](img/model_architecture_mention_pooling.jpg | width=18cm, height=7cm). The example sentence is "Absence of alpha-syntrophin leads to structurally aberrant neuromuscular synapses deficient in utrophin". (Source: BioInfer corpus).
 
 
 ## Installation
