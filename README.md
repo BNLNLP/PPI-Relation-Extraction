@@ -1,7 +1,7 @@
 # PPI-Relation-Extraction
 This is the official code of the paper:
 
-Extracting Protein-Protein Interactions (PPIs) from Biomedical Literature using Attention-based Relational Context Information (link will be added.)
+Extracting Protein-Protein Interactions (PPIs) from Biomedical Literature using Attention-based Relational Context Information (TODO: add a link)
 
 ## Overview
 The project aims to build a Protein-Protein Interaction (PPI) extraction model based on Transformer architecture. 

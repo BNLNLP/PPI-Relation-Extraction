@@ -20,8 +20,8 @@ PPI relations are tagged with either *positive* or *negative*.
 * LLL (https://hal.inrae.fr/hal-02762818/document)
 
 ## Typed PPI data
-Our PPI annotations with interaction types (*enzyme*, *structural*, or *negative*) are the expanded version of the five benchmark corpora and the BioCreative VI protein interaction dataset (Track 4: Mining protein interactions and mutations for precision medicine (PM).
-* BioCreative VI (https://academic.oup.com/database/article/doi/10.1093/database/bay147/5303240?login=true)
+Our PPI annotations with interaction types (*enzyme*, *structural*, or *negative*) are the expanded version of the five PPI benchmark corpora and the BioCreative VI protein interaction dataset (Track 4: Mining protein interactions and mutations for precision medicine (PM).
+* BioCreative VI (https://academic.oup.com/database/article/doi/10.1093/database/bay147/5303240)
 
 Table below displays the corpora statistics. The annotation work in all corpora has been carried out in a sentence boundary as engaged in the five PPI benchmark corpora.
 
@@ -76,10 +76,11 @@ Table below displays the corpora statistics. The annotation work in all corpora 
         <td>3,830</td>
     </tr>
 </table>
-The significant reduction from the original data in *negative* samples is explained in the section III-A3 in the paper.
+
+The significant reduction from the original data in *negative* samples is explained in the section III-A3 in our paper (TODO: add a link).
+If you use the Typed PPI data for your research, please cite the following paper.
 
 
 ## Citation
-If you use the Typed PPI data for your research, please cite the following paper.
 
 TBA
