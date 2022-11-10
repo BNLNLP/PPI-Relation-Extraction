@@ -11,7 +11,7 @@ use the EU-ADR data in [BioBERT](https://academic.oup.com/bioinformatics/article
 * EU-ADR (https://www.sciencedirect.com/science/article/pii/S1532046412000573)
 
 ## PPI benchmark data
-We adopt the unified version of PPI benchmark datasets provided by [Pyysalo et al.](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-9-S3-S6) that has been used in the SOTA models. In the datasets, the
+We adopt the unified version of PPI benchmark datasets provided by [Pyysalo et al., 2008](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-9-S3-S6) that has been used in the SOTA models. In the datasets, the
 PPI relations are tagged with either *positive* or *negative*.
 * AIMed (https://www.sciencedirect.com/science/article/pii/S0933365704001319)
 * BioInfer (https://link.springer.com/article/10.1186/1471-2105-8-50)
