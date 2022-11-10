@@ -1,17 +1,17 @@
 # PPI-Relation-Extraction
 This is the official code of the paper:
 
-Protein-Protein Interactions (PPIs) Extraction from Biomedical Literature using Attention-based Relational Context Information (link will be added.)
+Extracting Protein-Protein Interactions (PPIs) from Biomedical Literature using Attention-based Relational Context Information (link will be added.)
 
 ## Overview
 The project aims to build a Protein-Protein Interaction (PPI) extraction model based on Transformer architecture. 
 We used the five PPI benchmark datasets and four biomedical relation extraction (RE) datasets to evaluate our model.
 We provide the extended version of PPI datasets, called typed PPI, which have further augmented those positive/negative calls with own PPI role labels (structural or enzymatic). <br/>
 
-![PPI_RE_architecture](img/model_architecture.jpg)
-*Figure: The relation representation based on attention-based relational context consists of entity start markers and the max-pooled of relational context which is a series of tokens chosen by attention probability
-of the entities. If markers are unused, entity start markers are replaced with the max-pooled of two entity contextualized embeddings. The example sentence is ”Absence of alpha-syntrophin leads to structurally aberrant neuromuscular synapses deficient in utrophin.” (source from:
-BioInfer corpus)*
+![PPI_RE_architecture](img/model_architecture_entity_start.jpg)
+*Figure: The relation representation consists of entity start markers and the max-pooled of relational context, which is a series of tokens chosen by attention probability of the entities. The relation representation based on mention pooling is depicted in [mention_pooling](img/model_architecture_mention_pooling.jpg). The example sentence is "Absence of alpha-syntrophin leads to structurally aberrant neuromuscular synapses deficient in utrophin". (Source: BioInfer corpus).
+
+
 
 ## Installation
 The code was implemented on Python version 3.9 and and PyTorch version = 1.10.2. The versions of the dependencies are listed in requirements.txt
