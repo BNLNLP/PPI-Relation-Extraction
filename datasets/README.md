@@ -6,6 +6,8 @@ There are various versions of the [ChemProt](https://www.ncbi.nlm.nih.gov/pmc/ar
 benchmark data, the Biomedical Language Understanding and Reasoning Benchmark ([BLURB](https://dl.acm.org/doi/pdf/10.1145/3458754)). We also
 use the [EU-ADR](https://www.sciencedirect.com/science/article/pii/S1532046412000573) data in [BioBERT](https://academic.oup.com/bioinformatics/article/36/4/1234/5566506).
 
+* EU-ADR_BioBERT (train & validation) is used for the evaluation on different relation context size *
+
 ## PPI benchmark data
 We adopt the unified version of PPI benchmark datasets ([AIMed](https://www.sciencedirect.com/science/article/pii/S0933365704001319), 
 [BioInfer](https://link.springer.com/article/10.1186/1471-2105-8-50), 
