@@ -5,8 +5,12 @@ The pre-processed data for the experiments.
 There are various versions of the [ChemProt](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6051439/), [DDI](https://www.sciencedirect.com/science/article/pii/S1532046413001123?via%3Dihub), and [GAD](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-015-0472-9) datasets. Here, we adopt the recent and widely used
 benchmark data, the Biomedical Language Understanding and Reasoning Benchmark ([BLURB](https://dl.acm.org/doi/pdf/10.1145/3458754)). We also
 use the [EU-ADR](https://www.sciencedirect.com/science/article/pii/S1532046412000573) data in [BioBERT](https://academic.oup.com/bioinformatics/article/36/4/1234/5566506).
+EU-ADR_BioBERT (train & validation) is used for the evaluation on different relation context size (detailed in Appendix D in our paper). 
+The ChemProt, DDI, and GAD datasets consist of a train/validation/test set, while the EU-ADR contains 10-fold sets for cross validation.
+In all of the data, target entities are anonymized with predefined tags, including @GENE$, @CHEMICAL$, @DRUG$, and @DISEASE$. 
+In ChemProt and DDI, additional tags, @CHEM-GENE$ and @DRUG-DRUG$, are used for overlapping entities. 
+When entity markers are used, @CHEM-GENE$ and @DRUG-DRUG$ are surrounded by the [E1-E2] tag.
 
-* EU-ADR_BioBERT (train & validation) is used for the evaluation on different relation context size *
 
 ## PPI benchmark data
 We adopt the unified version of PPI benchmark datasets ([AIMed](https://www.sciencedirect.com/science/article/pii/S0933365704001319), 
