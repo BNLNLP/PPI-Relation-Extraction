@@ -12,22 +12,102 @@ use the [EU-ADR](https://www.sciencedirect.com/science/article/pii/S153204641200
 * In ChemProt and DDI, additional tags, `@CHEM-GENE$` and `@DRUG-DRUG$`, are used for overlapping entities. 
 When entity markers are used, `@CHEM-GENE$` and `@DRUG-DRUG$` are surrounded by the `[E1-E2]` tag.
 
+Table shows the statistics of biomedical relation extraction datasets.
+
+<table>
+    <tr>
+        <th></th>
+        <th>Train</th>
+        <th>Dev</th>
+        <th>Test</th>
+        <th>Total</th>
+    </tr>
+	<tr>
+        <th>ChemProt</th>
+        <td>18,035</td>
+        <td>11,268</td>
+        <td>15,745</td>
+        <td>45,048</td>
+    </tr>
+    <tr>
+        <th>DDI</th>
+        <td>25,296</td>
+        <td>2,496</td>
+        <td>5,716</td>
+		<td>33,508</td>
+    </tr>
+    <tr>
+        <th>GAD</th>
+        <td>4,261</td>
+        <td>535</td>
+        <td>534</td>
+		<td>5,330</td>
+    </tr>
+	<tr>
+        <th>EU-ADR</th>
+        <td>*NA*</td>
+        <td>*NA*</td>
+        <td>*NA*</td>
+		<td>355</td>
+    </tr>
+</table>
+
 
 ## PPI benchmark data
 We adopt the unified version of PPI benchmark datasets ([AIMed](https://www.sciencedirect.com/science/article/pii/S0933365704001319), 
 [BioInfer](https://link.springer.com/article/10.1186/1471-2105-8-50), 
 [HPRD50](https://academic.oup.com/bioinformatics/article/23/3/365/236564),
 [IEPA](http://psb.stanford.edu/psb-online/proceedings/psb02/ding.pdf),
-[LLL](https://hal.inrae.fr/hal-02762818/document)) provided by [Pyysalo et al., 2008](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-9-S3-S6) that has been used in the SOTA models. In the datasets, the
-PPI relations are tagged with either *positive* or *negative*. 
+[LLL](https://hal.inrae.fr/hal-02762818/document)) provided by [Pyysalo et al., 2008](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-9-S3-S6) that has been used in the SOTA models. 
+* In the datasets, the PPI relations are tagged with either *positive* or *negative*. 
 * The data contains 10-fold sets for cross validation.
+
+Table shows the statistics of five ppi benchmark corpora for *positive* and *negative* classes.
+
+<table>
+    <tr>
+        <th></th>
+        <th>Positive</th>
+        <th>Negative</th>
+    </tr>
+	<tr>
+        <th>AIMed</th>
+        <td>1,000</td>
+        <td>4,834</td>
+    </tr>
+    <tr>
+        <th>BioInfer</th>
+        <td>2,534</td>
+        <td>7,132</td>
+    </tr>
+	<tr>
+        <th>HPRD50</th>
+        <td>163</td>
+        <td>270</td>
+    </tr>
+    <tr>
+        <th>IEPA</th>
+        <td>335</td>
+        <td>482</td>
+    </tr>
+    <tr>
+        <th>LLL</th>
+        <td>164</td>
+        <td>166</td>
+    </tr>
+	<tr>
+        <th>TOTAL</th>
+        <td>4,196</td>
+        <td>12,884</td>
+    </tr>
+</table>
 
 ## Typed PPI data
 Our PPI annotations with interaction types (*enzyme*, *structural*, or *negative*) are the expanded version of the five PPI benchmark corpora and the [BioCreative VI](https://academic.oup.com/database/article/doi/10.1093/database/bay147/5303240) protein interaction dataset (Track 4: Mining protein interactions and mutations for precision medicine (PM)).
 * The data is a 10-fold set for cross validation.
 * You can find the annotation rules and comments [here](PPI/type_annotation/annotation_resources).
 
-Table below displays the corpora statistics. The annotation work in all corpora has been carried out in a sentence boundary as engaged in the five PPI benchmark corpora.
+Table displays the corpora statistics. The annotation work in all corpora has been carried out in a sentence boundary as engaged in the five PPI benchmark corpora.
 The significant reduction from the original data in *negative* samples is explained in the section III-A3 in our paper (TODO: add a link).
 
 
