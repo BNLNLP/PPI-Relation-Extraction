@@ -19,12 +19,14 @@ We adopt the unified version of PPI benchmark datasets ([AIMed](https://www.scie
 [HPRD50](https://academic.oup.com/bioinformatics/article/23/3/365/236564),
 [IEPA](http://psb.stanford.edu/psb-online/proceedings/psb02/ding.pdf),
 [LLL](https://hal.inrae.fr/hal-02762818/document)) provided by [Pyysalo et al., 2008](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-9-S3-S6) that has been used in the SOTA models. In the datasets, the
-PPI relations are tagged with either *positive* or *negative*. The data contains 10-fold sets for cross validation.
+PPI relations are tagged with either *positive* or *negative*. 
+* The data contains 10-fold sets for cross validation.
 
 ## Typed PPI data
 Our PPI annotations with interaction types (*enzyme*, *structural*, or *negative*) are the expanded version of the five PPI benchmark corpora and the [BioCreative VI](https://academic.oup.com/database/article/doi/10.1093/database/bay147/5303240) protein interaction dataset (Track 4: Mining protein interactions and mutations for precision medicine (PM)).
 * The data is a 10-fold set for cross validation.
 * You can find the annotation rules and comments [here](PPI/type_annotation/annotation_resources).
+
 Table below displays the corpora statistics. The annotation work in all corpora has been carried out in a sentence boundary as engaged in the five PPI benchmark corpora.
 The significant reduction from the original data in *negative* samples is explained in the section III-A3 in our paper (TODO: add a link).
 
