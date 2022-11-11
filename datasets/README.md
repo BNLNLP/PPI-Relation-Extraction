@@ -7,8 +7,7 @@ benchmark data, the Biomedical Language Understanding and Reasoning Benchmark ([
 use the [EU-ADR](https://www.sciencedirect.com/science/article/pii/S1532046412000573) data in [BioBERT](https://academic.oup.com/bioinformatics/article/36/4/1234/5566506).
 
 ## PPI benchmark data
-We adopt the unified version of PPI benchmark datasets (
-[AIMed](https://www.sciencedirect.com/science/article/pii/S0933365704001319), 
+We adopt the unified version of PPI benchmark datasets ([AIMed](https://www.sciencedirect.com/science/article/pii/S0933365704001319), 
 [BioInfer](https://link.springer.com/article/10.1186/1471-2105-8-50), 
 [HPRD50](https://academic.oup.com/bioinformatics/article/23/3/365/236564),
 [IEPA](http://psb.stanford.edu/psb-online/proceedings/psb02/ding.pdf),
