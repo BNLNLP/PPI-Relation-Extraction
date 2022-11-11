@@ -6,7 +6,7 @@ Extracting Protein-Protein Interactions (PPIs) from Biomedical Literature using 
 ## Overview
 The project aims to build a Protein-Protein Interaction (PPI) extraction model based on Transformer architecture. 
 We used the five PPI benchmark datasets and four biomedical relation extraction (RE) datasets to evaluate our model.
-We provide the expanded version of PPI datasets, called typed PPI, which further delineate the functional role of proteins (*structural* or *enzymatic*). <br/>
+In addition, we provide the expanded version of PPI datasets, called typed PPI, which further delineate the functional role of proteins (*structural* or *enzymatic*). <br/>
 
 ![PPI_RE_architecture](img/model_architecture_entity_start.jpg)
 *Figure: The relation representation consists of entity start markers and the max-pooled of relational context, which is a series of tokens chosen by attention probability of the entities. The relation representation based on mention pooling is depicted in [mention_pooling](img/model_architecture_mention_pooling.jpg). The example sentence is "Absence of alpha-syntrophin leads to structurally aberrant neuromuscular synapses deficient in utrophin". (Source: BioInfer corpus).*
@@ -16,7 +16,7 @@ We provide the expanded version of PPI datasets, called typed PPI, which further
 The code was implemented on Python version 3.9 and and PyTorch version = 1.10.2. The versions of the dependencies are listed in requirements.txt
 
 ## Datasets
-** Please refer the [README.md](datasets/README.md) in the datasets directory.
+** Please refer to the [README.md](datasets/README.md) in the datasets directory.
 
 
 ## Reproduction
