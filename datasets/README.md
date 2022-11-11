@@ -6,11 +6,11 @@ There are various versions of the [ChemProt](https://www.ncbi.nlm.nih.gov/pmc/ar
 benchmark data, the Biomedical Language Understanding and Reasoning Benchmark ([BLURB](https://dl.acm.org/doi/pdf/10.1145/3458754)). We also
 use the [EU-ADR](https://www.sciencedirect.com/science/article/pii/S1532046412000573) data in [BioBERT](https://academic.oup.com/bioinformatics/article/36/4/1234/5566506).
 
-* *EU-ADR_BioBERT (train & validation)* is used for the evaluation on different relation context size (detailed in Appendix D in our paper). 
 * The ChemProt, DDI, and GAD datasets consist of a train/validation/test set, while the EU-ADR contains 10-fold sets for cross validation.
-* In all of the data, target entities are anonymized with predefined tags, including `@GENE$`, @CHEMICAL$, @DRUG$, and @DISEASE$. 
-* In ChemProt and DDI, additional tags, @CHEM-GENE$ and @DRUG-DRUG$, are used for overlapping entities. 
-When entity markers are used, @CHEM-GENE$ and @DRUG-DRUG$ are surrounded by the [E1-E2] tag.
+* "EU-ADR_BioBERT (train & validation)" is used for the evaluation on different relation context size (detailed in Appendix D in our paper). 
+* In all of the data, target entities are anonymized with predefined tags, including `@GENE$`, `@CHEMICAL$`, `@DRUG$`, and `@DISEASE$`. 
+* In ChemProt and DDI, additional tags, `@CHEM-GENE$` and `@DRUG-DRUG$`, are used for overlapping entities. 
+When entity markers are used, `@CHEM-GENE$` and `@DRUG-DRUG$` are surrounded by the `[E1-E2]` tag.
 
 
 ## PPI benchmark data
@@ -23,8 +23,8 @@ PPI relations are tagged with either *positive* or *negative*. The data contains
 
 ## Typed PPI data
 Our PPI annotations with interaction types (*enzyme*, *structural*, or *negative*) are the expanded version of the five PPI benchmark corpora and the [BioCreative VI](https://academic.oup.com/database/article/doi/10.1093/database/bay147/5303240) protein interaction dataset (Track 4: Mining protein interactions and mutations for precision medicine (PM)).
-The data is a 10-fold set for cross validation.
-You can find the annotation rules and comments [here](PPI/type_annotation/annotation_resources).
+* The data is a 10-fold set for cross validation.
+* You can find the annotation rules and comments [here](PPI/type_annotation/annotation_resources).
 Table below displays the corpora statistics. The annotation work in all corpora has been carried out in a sentence boundary as engaged in the five PPI benchmark corpora.
 The significant reduction from the original data in *negative* samples is explained in the section III-A3 in our paper (TODO: add a link).
 
