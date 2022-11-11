@@ -16,9 +16,7 @@ We adopt the unified version of PPI benchmark datasets (
 PPI relations are tagged with either *positive* or *negative*.
 
 ## Typed PPI data
-Our PPI annotations with interaction types (*enzyme*, *structural*, or *negative*) are the expanded version of the five PPI benchmark corpora and the BioCreative VI protein interaction dataset (Track 4: Mining protein interactions and mutations for precision medicine (PM)).
-* BioCreative VI (https://academic.oup.com/database/article/doi/10.1093/database/bay147/5303240)
-
+Our PPI annotations with interaction types (*enzyme*, *structural*, or *negative*) are the expanded version of the five PPI benchmark corpora and the [BioCreative VI](https://academic.oup.com/database/article/doi/10.1093/database/bay147/5303240) protein interaction dataset (Track 4: Mining protein interactions and mutations for precision medicine (PM)).
 You can find the annotation rules and comments [here](PPI/type_annotation/annotation_resources).
 Table below displays the corpora statistics. The annotation work in all corpora has been carried out in a sentence boundary as engaged in the five PPI benchmark corpora.
 The significant reduction from the original data in *negative* samples is explained in the section III-A3 in our paper (TODO: add a link).
