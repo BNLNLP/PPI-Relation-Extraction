@@ -7,9 +7,9 @@ benchmark data, the Biomedical Language Understanding and Reasoning Benchmark ([
 use the [EU-ADR](https://www.sciencedirect.com/science/article/pii/S1532046412000573) data in [BioBERT](https://academic.oup.com/bioinformatics/article/36/4/1234/5566506).
 
 * *EU-ADR_BioBERT (train & validation)* is used for the evaluation on different relation context size (detailed in Appendix D in our paper). 
-The ChemProt, DDI, and GAD datasets consist of a train/validation/test set, while the EU-ADR contains 10-fold sets for cross validation.
-In all of the data, target entities are anonymized with predefined tags, including @GENE$, @CHEMICAL$, @DRUG$, and @DISEASE$. 
-In ChemProt and DDI, additional tags, @CHEM-GENE$ and @DRUG-DRUG$, are used for overlapping entities. 
+* The ChemProt, DDI, and GAD datasets consist of a train/validation/test set, while the EU-ADR contains 10-fold sets for cross validation.
+* In all of the data, target entities are anonymized with predefined tags, including @GENE$, @CHEMICAL$, @DRUG$, and @DISEASE$. 
+* In ChemProt and DDI, additional tags, @CHEM-GENE$ and @DRUG-DRUG$, are used for overlapping entities. 
 When entity markers are used, @CHEM-GENE$ and @DRUG-DRUG$ are surrounded by the [E1-E2] tag.
 
 
