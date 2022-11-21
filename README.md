@@ -57,7 +57,7 @@ python PPI-Relation-Extraction/src/relation_extraction/run_re.py \
 Refer to the bash script [run.sh](script/run.sh), and you can find the hyperparameter settings of the datasets in [hyper-parameters-configuration.txt](config/hyper-parameters-configuration.txt)
 
 ## Results
-Here are the results of the experiments. The model was trained on the machine, Tesla V100-SXM2-32GB × 2. Note different number of GPUs and batch size can produce slightly different results.
+Here are the results of the experiments. The model was trained on a single NVIDIA V100 with two GPUs. Note different number of GPUs and batch size can produce slightly different results.
 
 
 ### Biomedical Relation Extraction benchmark data ###
