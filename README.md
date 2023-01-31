@@ -1,7 +1,7 @@
 # PPI-Relation-Extraction
 This is the official code of the paper:
 
-Extracting Protein-Protein Interactions (PPIs) from Biomedical Literature using Attention-based Relational Context Information (TODO: add a link)
+[Extracting Protein-Protein Interactions (PPIs) from Biomedical Literature using Attention-based Relational Context Information](https://ieeexplore.ieee.org/document/10021099)
 
 ## Overview
 The project aims to build a Protein-Protein Interaction (PPI) extraction model based on Transformer architecture. 
@@ -153,19 +153,16 @@ Here are the results of the experiments. The model was trained on a single NVIDI
 
 
 ## Citation
-TBA
-
-<!-- reference from NBFNet
 ```bibtex
-@article{zhu2021neural,
-  title={Neural bellman-ford networks: A general graph neural network framework for link prediction},
-  author={Zhu, Zhaocheng and Zhang, Zuobai and Xhonneux, Louis-Pascal and Tang, Jian},
-  journal={Advances in Neural Information Processing Systems},
-  volume={34},
-  year={2021}
+@inproceedings{park2022extracting,
+  title={Extracting Protein-Protein Interactions (PPIs) from Biomedical Literature using Attention-based Relational Context Information},
+  author={Park, Gilchan and McCorkle, Sean and Soto, Carlos and Blaby, Ian and Yoo, Shinjae},
+  booktitle={2022 IEEE International Conference on Big Data (Big Data)},
+  pages={2052--2061},
+  year={2022},
+  organization={IEEE}
 }
 ```
--->
 
 <!--
 ### Prerequisites

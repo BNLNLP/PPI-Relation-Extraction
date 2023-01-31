@@ -170,4 +170,13 @@ The significant reduction from the original data in *negative* samples is explai
 ## Citation
 If you use the Typed PPI data for your research, please cite the following paper.
 
-TBA
+```bibtex
+@inproceedings{park2022extracting,
+  title={Extracting Protein-Protein Interactions (PPIs) from Biomedical Literature using Attention-based Relational Context Information},
+  author={Park, Gilchan and McCorkle, Sean and Soto, Carlos and Blaby, Ian and Yoo, Shinjae},
+  booktitle={2022 IEEE International Conference on Big Data (Big Data)},
+  pages={2052--2061},
+  year={2022},
+  organization={IEEE}
+}
+```
